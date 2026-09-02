@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { useLocale } from "@/hooks/useLocale";
 import { AttachedSong } from "@/lib/music";
 import { getThumbnailUrl } from "@/hooks/useGlobalAudio";
-import { Search, Check, Sparkles, Disc, Play, Square, Loader2 } from "lucide-react";
+import { Search, Check, Disc, Play, Square, Loader2 } from "lucide-react";
 
 declare global {
   interface Window {
@@ -22,6 +22,50 @@ export interface SongAttachmentModalProps {
   onSelectSong: (song: AttachedSong) => void;
   currentSong?: AttachedSong | null;
 }
+
+// 5 Curated Default Popular Bangla Tracks (Displayed by default when query is empty)
+const DEFAULT_CURATED_SONGS: AttachedSong[] = [
+  {
+    id: "iPe2K-RRcT8",
+    youtubeId: "iPe2K-RRcT8",
+    title: "Jao Pakhi Bolo Tare",
+    artist: "Krishnokoli Islam",
+    thumbnail: "https://i.ytimg.com/vi/iPe2K-RRcT8/hqdefault.jpg",
+    duration: 209,
+  },
+  {
+    id: "sK38b9FwO_w",
+    youtubeId: "sK38b9FwO_w",
+    title: "Meghomilon",
+    artist: "Tahsan Khan",
+    thumbnail: "https://i.ytimg.com/vi/sK38b9FwO_w/hqdefault.jpg",
+    duration: 275,
+  },
+  {
+    id: "N6d3d9d3c_A",
+    youtubeId: "N6d3d9d3c_A",
+    title: "Tumi Robe Nirobe",
+    artist: "Rabindrasangeet",
+    thumbnail: "https://i.ytimg.com/vi/N6d3d9d3c_A/hqdefault.jpg",
+    duration: 242,
+  },
+  {
+    id: "86OFfPhQsNY",
+    youtubeId: "86OFfPhQsNY",
+    title: "Mon Shudhu Mon Chhuyechhe",
+    artist: "Partha Barua",
+    thumbnail: "https://i.ytimg.com/vi/86OFfPhQsNY/hqdefault.jpg",
+    duration: 275,
+  },
+  {
+    id: "CjM4q807kR0",
+    youtubeId: "CjM4q807kR0",
+    title: "Shey Je Boshe Ache",
+    artist: "Arnob",
+    thumbnail: "https://i.ytimg.com/vi/CjM4q807kR0/hqdefault.jpg",
+    duration: 215,
+  },
+];
 
 function SongThumbnail({ song }: { song: AttachedSong }) {
   const [error, setError] = useState(false);
@@ -54,9 +98,9 @@ export function SongAttachmentModal({
   const { locale } = useLocale();
 
   // Controlled input value separated from debounced query to prevent focus drops
-  const [inputValue, setInputValue] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [songs, setSongs] = useState<AttachedSong[]>([]);
+  const [songs, setSongs] = useState<AttachedSong[]>(DEFAULT_CURATED_SONGS);
   const [loading, setLoading] = useState(false);
 
   // 20-second preview state
@@ -68,6 +112,7 @@ export function SongAttachmentModal({
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasFocusedRef = useRef(false);
 
   // Stop active preview helper
   const stopActivePreview = useCallback(() => {
@@ -90,17 +135,20 @@ export function SongAttachmentModal({
     setIsPreviewBuffering(false);
   }, []);
 
-  // Initialize background YouTube iframe player for modal preview
+  // Initialize background YouTube iframe player once when modal opens
   useEffect(() => {
     if (!isOpen) {
       stopActivePreview();
+      hasFocusedRef.current = false;
       return;
     }
 
-    // Auto-focus input smoothly when modal opens
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
+    if (!hasFocusedRef.current) {
+      hasFocusedRef.current = true;
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
 
     const initPreviewPlayer = () => {
       if (!window.YT || typeof window.YT.Player !== "function") return;
@@ -163,17 +211,27 @@ export function SongAttachmentModal({
     }
   }, [isOpen, stopActivePreview]);
 
-  // Debounce keystrokes into debouncedQuery without re-rendering input container
+  // Debounce search query: 300ms delay, instant reset to 5 defaults when empty
   useEffect(() => {
+    const trimmed = searchTerm.trim();
+    if (!trimmed) {
+      setDebouncedQuery("");
+      setSongs(DEFAULT_CURATED_SONGS);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     const timer = setTimeout(() => {
-      setDebouncedQuery(inputValue.trim());
-    }, inputValue.trim() ? 300 : 0);
+      setDebouncedQuery(trimmed);
+    }, 300);
+
     return () => clearTimeout(timer);
-  }, [inputValue]);
+  }, [searchTerm]);
 
   // Fetch search results on debouncedQuery changes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !debouncedQuery) return;
 
     let isMounted = true;
     setLoading(true);
@@ -252,6 +310,8 @@ export function SongAttachmentModal({
     onClose();
   };
 
+  const hasSearchQuery = searchTerm.trim().length > 0;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -274,16 +334,17 @@ export function SongAttachmentModal({
             : "Attach a soundtrack to play while the recipient reads your letter."}
         </p>
 
-        {/* Stable Native Input Container to prevent focus drops on keystroke */}
+        {/* Stable Native Input Container with persistent DOM element & id */}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#857367] dark:text-[#A592A4]">
             <Search size={18} />
           </div>
           <input
+            id="song-search-input"
             ref={inputRef}
             type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             placeholder={
               locale === "bn"
                 ? "গানের নাম বা শিল্পীর নাম লিখুন..."
@@ -293,13 +354,13 @@ export function SongAttachmentModal({
           />
         </div>
 
-        {/* Dynamic Songs List with 20s Preview Engine */}
+        {/* Dynamic Songs List or 5 Default Curated Bangla Tracks */}
         <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
           {loading && songs.length === 0 ? (
             <div className="py-8 text-center text-xs font-mono text-[#857367] dark:text-[#A592A4] animate-pulse">
               {locale === "bn" ? "গান খোঁজা হচ্ছে..." : "Searching tracks..."}
             </div>
-          ) : songs.length === 0 ? (
+          ) : !loading && hasSearchQuery && songs.length === 0 ? (
             <div className="py-8 text-center text-xs text-[#857367] dark:text-[#A592A4]">
               {locale === "bn" ? "কোনো গান পাওয়া যায়নি" : "No songs found for this query"}
             </div>
@@ -384,11 +445,10 @@ export function SongAttachmentModal({
           )}
         </div>
 
-        {/* Footer Actions */}
+        {/* Footer Actions with Clean Single Accent Label */}
         <div className="flex items-center justify-between pt-3 border-t border-[#F0E2D2] dark:border-[#351D4D]">
-          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#857367] dark:text-[#A592A4]">
-            <Sparkles size={12} className="text-[#E88B60]" />
-            <span>{locale === "bn" ? "✨ চিঠির গান" : "✨ Letter Soundtrack"}</span>
+          <div className="text-[11px] font-mono text-[#857367] dark:text-[#A592A4]">
+            <span>✨ {locale === "bn" ? "চিঠির গান" : "Letter Soundtrack"}</span>
           </div>
           <Button variant="ghost" size="sm" onClick={handleClose}>
             {locale === "bn" ? "বাতিল" : "Cancel"}

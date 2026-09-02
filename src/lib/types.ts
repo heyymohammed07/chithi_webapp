@@ -14,6 +14,14 @@ export type PaperStyleId =
 export type StampId = "wax" | "topSecret" | "memory" | "heartbreak";
 
 export type FontId =
+  | "dearSecret"
+  | "heartfelt"
+  | "untoldTale"
+  | "bnCursive"
+  | "bnDiary"
+  | "bnScribble"
+  | "bnTypewriter"
+  | "bnSerif"
   | "handwriting1"
   | "handwriting2"
   | "handwriting3"

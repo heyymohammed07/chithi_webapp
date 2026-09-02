@@ -419,6 +419,10 @@ export function getRedis(): RedisLike {
       url: env.UPSTASH_REDIS_REST_URL,
       token: env.UPSTASH_REDIS_REST_TOKEN,
     });
+    // Add zrevrange compatibility polyfill for Upstash Redis
+    (client as any).zrevrange = function (key: string, min: number, max: number) {
+      return (this as Redis).zrange(key, min, max, { rev: true });
+    };
     globalForRedis._chithiRedisInstance = client as unknown as RedisLike;
     return globalForRedis._chithiRedisInstance;
   }

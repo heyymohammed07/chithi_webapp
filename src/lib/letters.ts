@@ -154,7 +154,10 @@ export async function listLetters(usernameLower: string): Promise<LetterSummary[
   const redis = getRedis();
 
   // 1. Read all letter IDs in reverse chronological order
-  const letterIds = await redis.zrevrange(keys.mailboxLetters(usernameLower), 0, -1);
+  const letterIds: string[] =
+    typeof redis.zrange === "function"
+      ? await redis.zrange(keys.mailboxLetters(usernameLower), 0, -1, { rev: true })
+      : await redis.zrevrange(keys.mailboxLetters(usernameLower), 0, -1);
   if (!letterIds || letterIds.length === 0) {
     return [];
   }
@@ -176,7 +179,13 @@ export async function listLetters(usernameLower: string): Promise<LetterSummary[
       continue;
     }
 
-    const letter: LetterRecord = typeof raw === "string" ? JSON.parse(raw) : raw;
+    let letter: LetterRecord;
+    try {
+      letter = typeof raw === "string" ? JSON.parse(raw) : (raw as LetterRecord);
+    } catch {
+      if (id) ghostIds.push(id);
+      continue;
+    }
 
     // Check if letter burned out mid-session
     if (letter.burnAt !== null && now > letter.burnAt) {

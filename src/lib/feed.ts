@@ -90,7 +90,10 @@ export async function listFeedItems(
   // Fetch page of IDs using index range
   const start = cursor;
   const stop = cursor + FEED_PAGE_SIZE - 1;
-  const feedIds = await redis.zrevrange(indexKey, start, stop);
+  const feedIds =
+    typeof redis.zrange === "function"
+      ? await redis.zrange(indexKey, start, stop, { rev: true })
+      : await redis.zrevrange(indexKey, start, stop);
 
   if (!feedIds || feedIds.length === 0) {
     return { items: [], nextCursor: null };

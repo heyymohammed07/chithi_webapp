@@ -121,11 +121,20 @@ export default function InboxPage(props: {
       setMailboxMeta(metaJson.data);
 
       // 2. Fetch letters list with authentication
+      const storedToken =
+        token ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem(`chithi:token:${usernameLower}`)
+          : null);
+
+      const headers: Record<string, string> = {};
+      if (storedToken) {
+        headers["Authorization"] = `Bearer ${storedToken}`;
+      }
+
       const listRes = await fetch(
         `/api/letters/list?username=${encodeURIComponent(usernameLower)}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
+        { headers }
       );
 
       const listJson = await listRes.json();
@@ -138,11 +147,12 @@ export default function InboxPage(props: {
         return;
       }
 
-      const letterList: LetterSummary[] = listJson.data.letters || [];
+      const letterList: LetterSummary[] = listJson.data?.letters || [];
       setLetters(letterList);
       setUnreadCount(letterList.filter((l) => !l.isOpened).length);
       setIsUnauthorized(false);
-    } catch {
+    } catch (err) {
+      console.error("[loadInbox error]", err);
       setIsUnauthorized(true);
     } finally {
       setIsLoading(false);
@@ -158,11 +168,20 @@ export default function InboxPage(props: {
     setOpeningLetterId(letterId);
 
     try {
+      const storedToken =
+        token ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem(`chithi:token:${usernameLower}`)
+          : null);
+
+      const headers: Record<string, string> = {};
+      if (storedToken) {
+        headers["Authorization"] = `Bearer ${storedToken}`;
+      }
+
       const res = await fetch(
         `/api/letters/${letterId}?username=${encodeURIComponent(usernameLower)}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
+        { headers }
       );
 
       const json = await res.json();

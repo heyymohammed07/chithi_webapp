@@ -10,6 +10,12 @@ import { purgeInactiveMailbox, touchMailboxLogin } from "./mailbox";
  * Extracts authentication token from cookie or Authorization Bearer header.
  */
 export function extractAuthToken(req: Request, usernameLower: string): string | null {
+  try {
+    const url = new URL(req.url);
+    const keyParam = url.searchParams.get("key");
+    if (keyParam) return keyParam.trim();
+  } catch {}
+
   const cookieHeader = req.headers.get("cookie");
   if (cookieHeader) {
     const cookieName = `chithi_s_${usernameLower}`;
