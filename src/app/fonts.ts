@@ -6,6 +6,7 @@ import {
   Dancing_Script,
   Homemade_Apple,
   Courier_Prime,
+  Special_Elite,
   Hind_Siliguri,
   Noto_Serif_Bengali,
 } from "next/font/google";
@@ -79,6 +80,14 @@ export const courierPrime = Courier_Prime({
   adjustFontFallback: true,
 });
 
+export const specialElite = Special_Elite({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-typewriter",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
 // Local Bengali Handwriting Fonts
 export const bnHandwriting1 = localFont({
   src: "../../public/fonts/bensen-handwriting.ttf",
@@ -101,4 +110,4 @@ export const bnHandwriting3 = localFont({
   fallback: ["Hind Siliguri", "cursive", "sans-serif"],
 });
 
-export const fontVariables = `${fraunces.variable} ${plusJakartaSans.variable} ${hindSiliguri.variable} ${notoSerifBengali.variable} ${caveat.variable} ${dancingScript.variable} ${homemadeApple.variable} ${courierPrime.variable} ${bnHandwriting1.variable} ${bnHandwriting2.variable} ${bnHandwriting3.variable}`;
+export const fontVariables = `${fraunces.variable} ${plusJakartaSans.variable} ${hindSiliguri.variable} ${notoSerifBengali.variable} ${caveat.variable} ${dancingScript.variable} ${homemadeApple.variable} ${courierPrime.variable} ${specialElite.variable} ${bnHandwriting1.variable} ${bnHandwriting2.variable} ${bnHandwriting3.variable}`;

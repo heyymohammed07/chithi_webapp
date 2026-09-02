@@ -46,19 +46,19 @@ export function FontPicker({ selected, onChange }: FontPickerProps) {
               role="radio"
               aria-checked={isSelected}
               onClick={() => onChange(key)}
-              className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E88B60] flex flex-col justify-between cursor-pointer ${
+              className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E88B60] flex flex-col justify-between cursor-pointer ${
                 isSelected
                   ? "bg-[#FFE5B4]/80 dark:bg-[#351D4D] border-[#E88B60] text-[#382A22] dark:text-[#FFF8F0] ring-1 ring-[#E88B60] shadow-xs"
                   : "bg-[#FFFDF9] dark:bg-[#170A24] border-[#F0E2D2] dark:border-[#351D4D] text-[#857367] dark:text-[#C5B3A6] hover:text-[#382A22] dark:hover:text-[#FFF8F0] hover:border-[#E88B60]/60"
               }`}
             >
               <span
-                className="text-sm sm:text-base leading-tight mb-1 truncate block font-medium"
+                className="text-xs sm:text-sm leading-tight mb-0.5 truncate block font-medium"
                 style={{ fontFamily: `${f.fontVar}` }}
               >
                 {locale === "bn" ? f.sample : f.sampleEn || f.sample}
               </span>
-              <span className="text-[10px] font-mono uppercase tracking-wider block truncate text-[#857367] dark:text-[#A592A4]">
+              <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider block truncate text-[#857367] dark:text-[#A592A4]">
                 {locale === "bn" ? f.nameBn : f.name}
               </span>
             </button>

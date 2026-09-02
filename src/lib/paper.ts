@@ -38,7 +38,7 @@ export const FONTS: Record<FontId, FontDefinition> = {
     id: "typewriter",
     name: "Typewriter",
     nameBn: "টাইপরাইটার",
-    fontVar: "var(--font-mono-paper), monospace",
+    fontVar: "var(--font-typewriter), var(--font-mono-paper), monospace",
     sample: "চিঠি ০৭/২৪",
     sampleEn: "Letter 07",
   },

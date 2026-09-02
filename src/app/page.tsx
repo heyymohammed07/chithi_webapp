@@ -294,14 +294,18 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                {/* Compact Countdown Box (1/3 visual scale, centered) */}
-                <div className="flex flex-col items-center justify-center text-center px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-black/40 border border-white/10 w-auto max-w-fit mx-auto self-center shadow-inner">
-                  <div className="flex items-center justify-center gap-1 text-[10px] sm:text-[11px] font-mono tracking-widest text-stone-400 uppercase">
-                    <Clock size={12} className="text-[#D9534F]" />
+                {/* Redesigned Countdown Box with Explicit Dimensions */}
+                <div className="w-full sm:w-[300px] md:w-[320px] min-h-[100px] sm:min-h-[110px] flex flex-col items-center justify-center text-center p-4 sm:p-5 rounded-2xl bg-black/40 border border-white/10 shadow-xl backdrop-blur-md self-center">
+                  <div className="text-xs font-mono uppercase tracking-widest text-stone-400 flex items-center justify-center gap-1.5">
+                    <Clock size={14} className="text-[#D9534F]" />
                     <span>{locale === "bn" ? "সময় বাকি:" : "TIME LEFT:"}</span>
                   </div>
-                  <div className="text-base sm:text-lg font-bold tracking-wider text-amber-100/90 leading-tight my-0.5 font-serif">
+                  <div className="text-2xl sm:text-3xl font-bold font-mono tracking-wider text-amber-200/95 leading-none my-1.5">
                     {countdown.formatted || "..."}
+                  </div>
+                  <div className="text-xs text-stone-400 flex items-center justify-center gap-1 mt-0.5">
+                    <Sparkles size={11} className="text-[#D9534F]" />
+                    <span>{locale === "bn" ? "ডাকবাক্স সচল" : "Mailbox Active"}</span>
                   </div>
                 </div>
               </div>

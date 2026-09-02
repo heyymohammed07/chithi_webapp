@@ -83,21 +83,21 @@ export function ProfileHeaderCard({
           </div>
         </div>
 
-        {/* Compact Countdown Box (1/3 visual scale, perfectly centered) */}
-        <div className="flex flex-col items-center justify-center text-center px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-black/40 border border-white/10 w-auto max-w-fit mx-auto md:mx-0 self-center shadow-inner">
-          <div className="flex items-center justify-center gap-1 text-[10px] sm:text-[11px] font-mono tracking-widest text-stone-400 uppercase">
-            <Clock size={12} className="text-[#E88B60]" />
+        {/* Redesigned Countdown Box with Explicit Dimensions */}
+        <div className="w-full sm:w-[300px] md:w-[320px] min-h-[100px] sm:min-h-[110px] flex flex-col items-center justify-center text-center p-4 sm:p-5 rounded-2xl bg-black/40 border border-white/10 shadow-xl backdrop-blur-md self-center">
+          <div className="text-xs font-mono uppercase tracking-widest text-stone-400 flex items-center justify-center gap-1.5">
+            <Clock size={14} className="text-[#E88B60]" />
             <span>{t("profile.timeLeft")}</span>
           </div>
-          <div className="text-base sm:text-lg font-bold tracking-wider text-amber-100/90 leading-tight my-0.5 font-serif">
+          <div className="text-2xl sm:text-3xl font-bold font-mono tracking-wider text-amber-200/95 leading-none my-1.5">
             {countdown.isExpired ? (
               <span className="text-[#D9534F]">{t("profile.statusExpired")}</span>
             ) : (
               countdown.formatted
             )}
           </div>
-          <div className="text-[9px] sm:text-[10px] text-stone-400 dark:text-stone-500 flex items-center justify-center gap-1">
-            <Sparkles size={9} className="text-[#E88B60]" />
+          <div className="text-xs text-stone-400 flex items-center justify-center gap-1 mt-0.5">
+            <Sparkles size={11} className="text-[#E88B60]" />
             <span>{t("profile.expiresIn")} {countdown.formatted}</span>
           </div>
         </div>
