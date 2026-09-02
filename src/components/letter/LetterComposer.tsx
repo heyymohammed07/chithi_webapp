@@ -484,8 +484,8 @@ export function LetterComposer({
     <form onSubmit={handleSubmit} className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-40 overflow-x-hidden">
       {/* DESKTOP & TABLET: 2-COLUMN BALANCED GRID (md: and lg:) */}
       <div className="hidden md:grid md:grid-cols-12 gap-6 lg:gap-8 items-start">
-        {/* Left Column (md:col-span-7 lg:col-span-7) */}
-        <div className="md:col-span-7 lg:col-span-7 flex flex-col gap-5">
+        {/* Left Column (md:col-span-7 flex flex-col gap-4) - Letter Canvas & Letter-Specific Content */}
+        <div className="md:col-span-7 flex flex-col gap-4">
           {/* 1. Writing Paper */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
@@ -518,16 +518,7 @@ export function LetterComposer({
           {/* 2. Background Music */}
           {BackgroundMusicCard}
 
-          {/* 3. Sender Hints */}
-          {SenderHintsCard}
-
-          {/* 4. Sender Identity */}
-          {SenderIdentityCard}
-
-          {/* 5. Post to Benami Kham */}
-          {BenamiKhamCard}
-
-          {/* 6. Advanced Mode Panel (Direct letters only) */}
+          {/* 3. Time Capsules & Locks (Direct letters only) */}
           {!isBottleMode && (
             <AdvancedModePanel
               state={advancedState}
@@ -535,28 +526,37 @@ export function LetterComposer({
               mailboxExpiresAt={mailboxExpiresAt}
             />
           )}
-
-          {/* 7. Desktop Submit Button */}
-          <div className="pt-2">
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="w-full text-base py-3.5 rounded-full shadow-lg cursor-pointer"
-              isLoading={isSending}
-            >
-              {isBottleMode ? t("bottle.sendButton") : t("composer.sendButton")}
-            </Button>
-          </div>
         </div>
 
-        {/* Right Column (md:col-span-5 lg:col-span-5) */}
-        <div className="md:col-span-5 lg:col-span-5 flex flex-col gap-5 md:sticky md:top-24">
+        {/* Right Column (md:col-span-5 flex flex-col gap-4) - Customization, Identity & Delivery Settings */}
+        <div className="md:col-span-5 flex flex-col gap-4">
           {/* 1. Target Preference (if bottle) */}
           {TargetPreferenceCard}
 
-          {/* 2. Placement & Style Box */}
+          {/* 2. Placement & Style Box (Parchment, Fonts, Stamp) */}
           {PlacementAndStyleCard}
+
+          {/* 3. Sender Hints (Optional) */}
+          {SenderHintsCard}
+
+          {/* 4. Sender Identity (Anonymous vs Named) */}
+          {SenderIdentityCard}
+
+          {/* 5. Post to Benami Kham (Public Wall toggle) */}
+          {BenamiKhamCard}
+        </div>
+
+        {/* Bottom Full-Width Submit CTA Button across both columns */}
+        <div className="col-span-12 pt-3">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full text-base py-4 rounded-full shadow-xl hover:shadow-amber-500/10 transition-all font-semibold cursor-pointer"
+            isLoading={isSending}
+          >
+            {isBottleMode ? t("bottle.sendButton") : t("composer.sendButton")}
+          </Button>
         </div>
       </div>
 
@@ -617,6 +617,19 @@ export function LetterComposer({
             mailboxExpiresAt={mailboxExpiresAt}
           />
         )}
+
+        {/* 9. Seal & Send Button (Mobile In-flow) */}
+        <div className="pt-2">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full text-base py-3.5 rounded-full shadow-lg cursor-pointer"
+            isLoading={isSending}
+          >
+            {isBottleMode ? t("bottle.sendButton") : t("composer.sendButton")}
+          </Button>
+        </div>
       </div>
 
       {/* Floating Action Bar (Mobile only) */}
