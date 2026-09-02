@@ -83,13 +83,13 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 w-full bg-[#FFFDF9]/90 dark:bg-[#0C0314]/90 backdrop-blur-md border-b border-[#F0E2D2] dark:border-[#351D4D] transition-colors duration-200">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-4">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
         {/* Brand Logo & Wordmark Left */}
         <Link
           href="/"
-          className="group inline-flex items-center gap-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E88B60] focus-visible:outline-offset-2 rounded-xl py-1 px-1.5"
+          className="group inline-flex items-center gap-2 sm:gap-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E88B60] focus-visible:outline-offset-2 rounded-xl py-1 px-1 shrink-0"
         >
-          <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 transition-transform duration-200 group-hover:scale-105 group-hover:-rotate-2">
+          <div className="relative w-7 h-7 sm:w-9 sm:h-9 shrink-0 transition-transform duration-200 group-hover:scale-105 group-hover:-rotate-2">
             <Image
               src="/logo.png"
               alt="Chithi Logo"
@@ -99,17 +99,17 @@ export function Header() {
               priority
             />
           </div>
-          <div className="inline-flex items-baseline gap-1.5">
-            <span className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-[#382A22] dark:text-[#FFF8F0] group-hover:text-[#E88B60] transition-colors">
+          <div className="inline-flex items-baseline gap-1 sm:gap-1.5">
+            <span className="font-serif text-xl sm:text-3xl font-bold tracking-tight text-[#382A22] dark:text-[#FFF8F0] group-hover:text-[#E88B60] transition-colors">
               Chithi
             </span>
-            <span className="font-serif text-sm sm:text-base font-normal text-[#E88B60] group-hover:text-[#D67448] transition-colors">
+            <span className="font-serif text-xs sm:text-base font-normal text-[#E88B60] group-hover:text-[#D67448] transition-colors">
               চিঠি
             </span>
           </div>
         </Link>
 
-        {/* Center: Stylized Navigation Pill Buttons */}
+        {/* Center: Stylized Navigation Pill Buttons (Desktop) */}
         <div className="hidden md:flex items-center gap-3">
           {/* Benami Kham (Public Wall) Interactive Pill */}
           <Link href="/feed">
@@ -138,7 +138,7 @@ export function Header() {
         </div>
 
         {/* Right: Active Session Navigation to /profile OR Login + Theme + Locale Toggle */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {activeUser ? (
             /* Active Mailbox Navigation Link to /profile */
             <Link
@@ -148,12 +148,12 @@ export function Header() {
               <motion.div
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-[#FFF8F0] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] text-xs font-medium text-[#382A22] dark:text-[#F5EBE6] shadow-sm hover:border-[#E88B60] hover:shadow-md transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 rounded-full bg-[#FFF8F0] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] text-xs font-medium text-[#382A22] dark:text-[#F5EBE6] shadow-sm hover:border-[#E88B60] hover:shadow-md transition-all cursor-pointer"
               >
-                <div className="w-5 h-5 rounded-full bg-[#E88B60] text-[11px] font-serif font-bold text-white flex items-center justify-center">
+                <div className="w-5 h-5 rounded-full bg-[#E88B60] text-[11px] font-serif font-bold text-white flex items-center justify-center shrink-0">
                   {activeUser.charAt(0).toUpperCase()}
                 </div>
-                <span className="font-mono text-[#382A22] dark:text-[#FFF8F0] font-semibold truncate max-w-[100px] sm:max-w-[120px]">
+                <span className="font-mono text-[#382A22] dark:text-[#FFF8F0] font-semibold truncate max-w-[80px] sm:max-w-[120px]">
                   @{activeUser}
                 </span>
                 {expiresAt > 0 && !countdown.isExpired && (
@@ -162,19 +162,20 @@ export function Header() {
                     <span>{countdown.formatted}</span>
                   </span>
                 )}
-                <span className="w-1.5 h-1.5 rounded-full bg-[#065F46] animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#065F46] animate-pulse shrink-0" />
               </motion.div>
             </Link>
           ) : (
-            /* No Session: Prominent Passcode Login Button */
+            /* No Session: Prominent Passcode Login Button with responsive text */
             <Link href="/recover">
               <motion.div
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#F0E2D2] dark:border-[#351D4D] bg-[#FFF8F0] dark:bg-[#170A24] hover:bg-[#FFE5B4]/30 dark:hover:bg-[#2B143D] hover:border-[#E88B60] text-xs font-medium text-[#857367] dark:text-[#A592A4] hover:text-[#382A22] dark:hover:text-[#FFF8F0] shadow-sm transition-all cursor-pointer"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-full border border-[#F0E2D2] dark:border-[#351D4D] bg-[#FFF8F0] dark:bg-[#170A24] hover:bg-[#FFE5B4]/30 dark:hover:bg-[#2B143D] hover:border-[#E88B60] text-xs font-medium text-[#857367] dark:text-[#A592A4] hover:text-[#382A22] dark:hover:text-[#FFF8F0] shadow-sm transition-all cursor-pointer"
               >
-                <KeyRound size={14} strokeWidth={1.5} className="text-[#E88B60]" />
-                <span>{locale === "bn" ? "পাসকোড দিয়ে লগইন" : "Login with Passcode"}</span>
+                <KeyRound size={13} strokeWidth={1.5} className="text-[#E88B60] shrink-0" />
+                <span className="hidden sm:inline">{locale === "bn" ? "পাসকোড দিয়ে লগইন" : "Login with Passcode"}</span>
+                <span className="sm:hidden">{locale === "bn" ? "লগইন" : "Login"}</span>
               </motion.div>
             </Link>
           )}

@@ -11,7 +11,7 @@ export function PageShell({
   className?: string;
 }) {
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#FAF7F2] dark:bg-[#0C0314] text-[#2D2522] dark:text-[#F5EBE6] transition-colors duration-200">
+    <div className="relative min-h-screen overflow-x-hidden flex flex-col bg-[#FAF7F2] dark:bg-[#0C0314] text-[#2D2522] dark:text-[#F5EBE6] transition-colors duration-200">
       {/* Skip link for accessibility */}
       <a
         href="#main-content"
@@ -24,7 +24,7 @@ export function PageShell({
 
       <main
         id="main-content"
-        className={`flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-12 ${className}`}
+        className={`flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12 ${className}`}
       >
         {children}
       </main>

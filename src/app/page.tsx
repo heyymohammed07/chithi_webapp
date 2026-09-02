@@ -495,7 +495,7 @@ export default function HomePage() {
                   publicUrl={createdMailbox.publicUrl}
                   isInitialCreation={true}
                   onEnterInbox={() => {
-                    window.location.href = createdMailbox.inboxUrl;
+                    router.push(`/inbox/${createdMailbox.username}?key=${encodeURIComponent(createdMailbox.accessToken)}`);
                   }}
                 />
               ) : (

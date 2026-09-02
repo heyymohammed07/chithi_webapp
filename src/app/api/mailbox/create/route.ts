@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
     const input = await parseJsonBody(req, CreateMailboxSchema);
     const created = await createMailbox(input);
 
-    const baseUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+    const proto = req.headers.get("x-forwarded-proto") || "https";
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+    const baseUrl = host ? `${proto}://${host}` : env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
     const inboxUrl = `${baseUrl}/inbox/${created.username}?key=${encodeURIComponent(created.accessToken)}`;
     const publicUrl = `${baseUrl}/${created.username}`;
 

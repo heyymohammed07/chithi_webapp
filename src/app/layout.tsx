@@ -5,7 +5,6 @@ import "./globals.css";
 import { LocaleProvider } from "@/i18n/provider";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { GrainOverlay } from "@/components/layout/GrainOverlay";
-import { AppleMusicPlayer } from "@/components/audio/AppleMusicPlayer";
 
 export const viewport: Viewport = {
   themeColor: "#FFFDF9",
@@ -49,7 +48,6 @@ export default function RootLayout({
           <LocaleProvider>
             <GrainOverlay />
             {children}
-            <AppleMusicPlayer />
           </LocaleProvider>
         </ThemeProvider>
         <Analytics />
