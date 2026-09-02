@@ -7,11 +7,14 @@ import { PageShell } from "@/components/layout/PageShell";
 import { ProfileHeaderCard } from "@/components/profile/ProfileHeaderCard";
 import { ProfileStatsGrid } from "@/components/profile/ProfileStatsGrid";
 import { PasscodeInfoModal } from "@/components/profile/PasscodeInfoModal";
+import { EnvelopeCard } from "@/components/envelope/EnvelopeCard";
+import { LetterReader } from "@/components/envelope/LetterReader";
 import { CopyField } from "@/components/ui/CopyField";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useLocale } from "@/hooks/useLocale";
 import { useAccessToken } from "@/hooks/useAccessToken";
+import { LetterRecord, LetterSummary } from "@/lib/types";
 import {
   Mail,
   KeyRound,
@@ -23,6 +26,9 @@ import {
   Inbox,
   AlertCircle,
   Bell,
+  Mailbox,
+  Filter,
+  X,
 } from "lucide-react";
 import { useLetterNotifications } from "@/hooks/useLetterNotifications";
 
@@ -41,8 +47,16 @@ export default function ProfilePage() {
 
   const [activeUsername, setActiveUsername] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [letters, setLetters] = useState<LetterSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
+
+  // Filter state: 'unread' | 'all' | null
+  const [activeFilter, setActiveFilter] = useState<"unread" | "all" | null>(null);
+
+  // Active letter reader state
+  const [activeLetter, setActiveLetter] = useState<LetterRecord | null>(null);
+  const [isReaderOpen, setIsReaderOpen] = useState(false);
 
   // Modals state
   const [isPasscodeModalOpen, setIsPasscodeModalOpen] = useState(false);
@@ -81,7 +95,7 @@ export default function ProfilePage() {
     }
   }, []);
 
-  // 2. Fetch authoritative profile data from server
+  // 2. Fetch authoritative profile data and letters from server
   const fetchProfile = useCallback(async () => {
     if (!activeUsername) {
       setLoading(false);
@@ -103,33 +117,48 @@ export default function ProfilePage() {
         headers["Authorization"] = `Bearer ${storedToken}`;
       }
 
-      const res = await fetch(
-        `/api/mailbox/profile?username=${encodeURIComponent(
-          activeUsername.toLowerCase()
-        )}`,
-        { headers }
-      );
+      const [profileRes, lettersRes] = await Promise.all([
+        fetch(
+          `/api/mailbox/profile?username=${encodeURIComponent(
+            activeUsername.toLowerCase()
+          )}`,
+          { headers }
+        ),
+        fetch(
+          `/api/letters/list?username=${encodeURIComponent(
+            activeUsername.toLowerCase()
+          )}`,
+          { headers }
+        ),
+      ]);
 
-      if (res.status === 410) {
+      if (profileRes.status === 410) {
         // Mailbox clock expired
         setErrorStatus(410);
         setLoading(false);
         return;
       }
 
-      if (res.status === 401 || res.status === 403) {
+      if (profileRes.status === 401 || profileRes.status === 403) {
         // Invalid or unauthorized token
         clearToken();
-        setErrorStatus(res.status);
+        setErrorStatus(profileRes.status);
         setLoading(false);
         return;
       }
 
-      const json = await res.json();
-      if (json.ok && json.data) {
-        setProfileData(json.data);
+      const profileJson = await profileRes.json();
+      if (profileJson.ok && profileJson.data) {
+        setProfileData(profileJson.data);
       } else {
-        setErrorStatus(res.status || 500);
+        setErrorStatus(profileRes.status || 500);
+      }
+
+      if (lettersRes.ok) {
+        const lettersJson = await lettersRes.json();
+        if (lettersJson.ok && lettersJson.data?.letters) {
+          setLetters(lettersJson.data.letters);
+        }
       }
     } catch {
       setErrorStatus(500);
@@ -144,57 +173,209 @@ export default function ProfilePage() {
     }
   }, [activeUsername, fetchProfile]);
 
+  // Handle stat card clicks (Filter toggle)
+  const handleFilterChange = (filter: "unread" | "all") => {
+    setActiveFilter((prev) => (prev === filter ? null : filter));
+  };
+
+  // Open letter reader modal
+  const handleOpenLetter = async (letterId: string) => {
+    if (!activeUsername) return;
+
+    try {
+      const storedToken =
+        token ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem(`chithi:token:${activeUsername.toLowerCase()}`)
+          : null);
+
+      const res = await fetch(
+        `/api/letters/${letterId}?username=${encodeURIComponent(
+          activeUsername.toLowerCase()
+        )}`,
+        {
+          headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
+        }
+      );
+
+      const json = await res.json();
+      if (json.ok && json.data?.letter) {
+        setActiveLetter(json.data.letter);
+        setIsReaderOpen(true);
+        // Mark as opened in local state
+        setLetters((prev) =>
+          prev.map((l) => (l.id === letterId ? { ...l, isOpened: true } : l))
+        );
+        if (profileData && profileData.unreadCount > 0) {
+          setProfileData({
+            ...profileData,
+            unreadCount: Math.max(0, profileData.unreadCount - 1),
+          });
+        }
+      } else {
+        router.push(`/inbox/${activeUsername}`);
+      }
+    } catch {
+      router.push(`/inbox/${activeUsername}`);
+    }
+  };
+
+  const handleReactToLetter = async (
+    letterId: string,
+    reaction: "heart" | "heartCrack"
+  ) => {
+    if (!activeUsername) return;
+    const storedToken =
+      token ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem(`chithi:token:${activeUsername.toLowerCase()}`)
+        : null);
+
+    await fetch(
+      `/api/letters/${letterId}/react?username=${encodeURIComponent(
+        activeUsername.toLowerCase()
+      )}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
+        },
+        body: JSON.stringify({ reaction }),
+      }
+    );
+
+    setLetters((prev) =>
+      prev.map((l) => (l.id === letterId ? { ...l, reaction } : l))
+    );
+    if (activeLetter && activeLetter.id === letterId) {
+      setActiveLetter({ ...activeLetter, reaction });
+    }
+  };
+
+  const handleDeleteLetter = async (letterId: string) => {
+    if (!activeUsername) return;
+    const storedToken =
+      token ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem(`chithi:token:${activeUsername.toLowerCase()}`)
+        : null);
+
+    await fetch(
+      `/api/letters/${letterId}?username=${encodeURIComponent(
+        activeUsername.toLowerCase()
+      )}`,
+      {
+        method: "DELETE",
+        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
+      }
+    );
+    setLetters((prev) => prev.filter((l) => l.id !== letterId));
+    setIsReaderOpen(false);
+  };
+
+  const handlePublishLetter = async (letterId: string) => {
+    if (!activeUsername) return;
+    const storedToken =
+      token ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem(`chithi:token:${activeUsername.toLowerCase()}`)
+        : null);
+
+    const res = await fetch(
+      `/api/letters/${letterId}/publish?username=${encodeURIComponent(
+        activeUsername.toLowerCase()
+      )}`,
+      {
+        method: "POST",
+        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
+      }
+    );
+    const json = await res.json();
+    if (!json.ok) {
+      throw new Error(json.error?.message || "errors.generic");
+    }
+    setLetters((prev) =>
+      prev.map((l) => (l.id === letterId ? { ...l, published: true } : l))
+    );
+  };
+
+  const handleDownloadPostcard = () => {
+    if (activeUsername) {
+      router.push(`/inbox/${activeUsername}`);
+    }
+  };
+
+  const handleReportLetter = () => {
+    if (activeUsername) {
+      router.push(`/inbox/${activeUsername}`);
+    }
+  };
+
   // Handle safe session disconnect
   const handleDisconnect = () => {
     if (activeUsername) {
       clearToken();
       if (typeof document !== "undefined") {
-        document.cookie = `chithi_s_${activeUsername.toLowerCase()}=; path=/; max-age=0; SameSite=Lax`;
+        document.cookie = `chithi_s_${activeUsername.toLowerCase()}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       }
     }
+    setActiveUsername(null);
+    setProfileData(null);
     setIsDisconnectModalOpen(false);
     router.push("/");
   };
 
-  // Base URL for public link
   const publicUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/${profileData?.username || activeUsername || ""}`
-      : `/${profileData?.username || activeUsername || ""}`;
+    typeof window !== "undefined" && profileData
+      ? `${window.location.origin}/${profileData.username}`
+      : profileData
+      ? `https://mychithi.vercel.app/${profileData.username}`
+      : "";
+
+  // Filtered letters list
+  const filteredLetters = letters.filter((l) => {
+    if (activeFilter === "unread") return !l.isOpened;
+    return true;
+  });
 
   return (
-    <PageShell className="max-w-4xl">
-      <div className="space-y-8">
-        {/* Navigation Breadcrumb */}
+    <PageShell>
+      <div className="max-w-4xl mx-auto space-y-8 py-6 sm:py-10 pb-36 sm:pb-44">
+        {/* Navigation Breadcrumb Bar */}
         <div className="flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-serif text-[#7C7069] hover:text-[#2D2522] transition-colors py-1.5 px-3 rounded-full hover:bg-[#FFFDF9] border border-transparent hover:border-[#EBE3D5]"
+            className="inline-flex items-center gap-2 text-xs font-mono text-[#7C7069] dark:text-[#A8988B] hover:text-[#2C1E16] dark:hover:text-[#FFF8F0] transition-colors group cursor-pointer"
           >
-            <ArrowLeft size={14} />
-            <span>{t("profile.homeAction")}</span>
+            <ArrowLeft
+              size={14}
+              className="group-hover:-translate-x-1 transition-transform"
+            />
+            <span>{t("profile.backToHome")}</span>
           </Link>
 
-          <span className="text-[11px] font-mono tracking-widest uppercase text-[#6D4E12] bg-[#FEF3C7] border border-[#FDE68A] px-3.5 py-1 rounded-full">
-            {t("profile.tag")}
-          </span>
+          {profileData && (
+            <button
+              type="button"
+              onClick={fetchProfile}
+              className="inline-flex items-center gap-1.5 text-xs font-mono text-[#7C7069] dark:text-[#A8988B] hover:text-[#2C1E16] dark:hover:text-[#FFF8F0] transition-colors cursor-pointer"
+            >
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+              <span>{locale === "bn" ? "রিফ্রেশ" : "Refresh"}</span>
+            </button>
+          )}
         </div>
 
-        {/* STATE 1: Loading Skeleton */}
-        {loading && (
-          <div className="p-8 rounded-3xl bg-[#FFFDF9] border border-[#EBE3D5] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] space-y-6 animate-pulse">
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-2xl bg-[#FAF7F2]" />
-              <div className="space-y-2 flex-1">
-                <div className="h-6 w-40 bg-[#FAF7F2] rounded-full" />
-                <div className="h-4 w-28 bg-[#FAF7F2] rounded-full" />
-              </div>
+        {/* STATE 1: Initial Loading Skeleton */}
+        {loading && !profileData && (
+          <div className="p-8 sm:p-12 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-xl text-center space-y-4 max-w-md mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-[#FFE5B4]/50 dark:bg-[#2B143D] flex items-center justify-center text-[#E88B60] mx-auto animate-pulse">
+              <Sparkles size={24} />
             </div>
-            <div className="h-12 w-full bg-[#FAF7F2] rounded-2xl" />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="h-28 bg-[#FAF7F2] rounded-2xl" />
-              <div className="h-28 bg-[#FAF7F2] rounded-2xl" />
-              <div className="h-28 bg-[#FAF7F2] rounded-2xl" />
+            <div className="space-y-2">
+              <div className="h-5 w-32 bg-[#EBE3D5] dark:bg-[#351D4D] rounded-full mx-auto animate-pulse" />
+              <div className="h-3 w-48 bg-[#EBE3D5]/60 dark:bg-[#351D4D]/60 rounded-full mx-auto animate-pulse" />
             </div>
           </div>
         )}
@@ -222,7 +403,7 @@ export default function ProfilePage() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full rounded-full gap-2 font-medium shadow-sm"
+                  className="w-full rounded-full gap-2 font-medium shadow-sm bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] border border-[#F0D59E]"
                 >
                   <KeyRound size={16} />
                   <span>{t("profile.loginAction")}</span>
@@ -241,12 +422,10 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* STATE 3: Expired / Gone (Status 410) */}
+        {/* STATE 3: Expired Mailbox */}
         {!loading && errorStatus === 410 && (
           <div className="p-8 sm:p-12 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] text-center space-y-5 max-w-lg mx-auto relative overflow-hidden transition-colors">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-28 h-6 washi-tape-wax rounded-sm" />
-
-            <div className="w-16 h-16 rounded-2xl bg-[#FAF7F2] dark:bg-[#1E0F2E] border border-[#EBE3D5] dark:border-[#351D4D] flex items-center justify-center text-[#7C7069] dark:text-[#A592A4] mx-auto shadow-sm">
+            <div className="w-16 h-16 rounded-2xl bg-[#FEE2E2] dark:bg-[#3B1219] border border-[#FECACA] dark:border-[#7F1D1D] flex items-center justify-center text-[#DC2626] mx-auto shadow-sm">
               <Clock size={28} strokeWidth={1.5} />
             </div>
 
@@ -264,7 +443,7 @@ export default function ProfilePage() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full rounded-full gap-2 font-medium shadow-sm"
+                  className="w-full rounded-full gap-2 font-medium shadow-sm bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] border border-[#F0D59E]"
                 >
                   <Sparkles size={16} />
                   <span>{t("profile.createAnother")}</span>
@@ -275,7 +454,7 @@ export default function ProfilePage() {
         )}
 
         {/* STATE 4: Network / API Error */}
-        {!loading && errorStatus && errorStatus !== 410 && (
+        {!loading && errorStatus && errorStatus !== 410 && errorStatus !== 401 && errorStatus !== 403 && (
           <div className="p-8 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] text-center space-y-4 max-w-md mx-auto transition-colors">
             <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] border border-[#FCA5A5] flex items-center justify-center text-[#D9534F] mx-auto">
               <AlertCircle size={22} />
@@ -303,7 +482,7 @@ export default function ProfilePage() {
         {/* STATE 5: Active Authenticated Profile */}
         {!loading && profileData && !errorStatus && (
           <div className="space-y-6">
-            {/* Incoming Letter Notification Opt-in Banner (§4.1) */}
+            {/* Incoming Letter Notification Opt-in Banner */}
             {isSupported && !isGranted && permission !== "denied" && (
               <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#FFE5B4]/50 dark:bg-[#170A24] border border-[#F0D59E] dark:border-[#351D4D] shadow-sm">
                 <div className="flex items-center gap-2.5 text-xs text-[#382A22] dark:text-[#FFF8F0]">
@@ -331,15 +510,109 @@ export default function ProfilePage() {
               expiresAt={profileData.expiresAt}
             />
 
-            {/* 2. Authoritative Mailbox Statistics Row (Pastel Scrapbook Tiles) */}
+            {/* 2. Interactive Authoritative Mailbox Statistics Row (Clickable Tile Filters) */}
             <ProfileStatsGrid
               username={profileData.username}
               unreadCount={profileData.unreadCount}
               totalEnvelopeCount={profileData.totalEnvelopeCount}
               acceptsBottles={profileData.acceptsBottles}
+              activeFilter={activeFilter}
+              onFilterChange={handleFilterChange}
             />
 
-            {/* 3. Public Mailbox URL Card (One-Tap Copy) */}
+            {/* 3. Prominent Hero CTA: Standalone "Open Secret Inbox" Banner (Directly between Stat Cards and Public Link) */}
+            <div className="w-full my-4">
+              <Link href={`/inbox/${profileData.username}`} className="block w-full">
+                <button
+                  type="button"
+                  className="w-full py-4 px-6 rounded-2xl bg-[#f5dfb8] hover:bg-[#ebd0a0] text-stone-900 font-semibold text-base shadow-lg hover:shadow-amber-500/10 transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] cursor-pointer"
+                >
+                  <Mail className="w-5 h-5 text-stone-800" />
+                  <span>{locale === "bn" ? "📬 গোপন ইনবক্স খুলুন" : "Open Secret Inbox"}</span>
+                </button>
+              </Link>
+            </div>
+
+            {/* Interactive Letter Grid / Tile View when Stat Card is Clicked */}
+            {activeFilter && (
+              <div className="p-6 sm:p-7 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-amber-400/40 shadow-xl space-y-5 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex items-center justify-between border-b border-[#F0E2D2] dark:border-[#351D4D] pb-3">
+                  <div className="flex items-center gap-2">
+                    <Filter size={16} className="text-[#E88B60]" />
+                    <h3 className="font-serif font-bold text-base text-[#2C1E16] dark:text-[#FFF8F0]">
+                      {activeFilter === "unread"
+                        ? locale === "bn"
+                          ? `অপঠিত চিঠিসমূহ (${profileData.unreadCount})`
+                          : `Unread Envelopes (${profileData.unreadCount})`
+                        : locale === "bn"
+                        ? `মোট প্রাপ্ত চিঠিসমূহ (${profileData.totalEnvelopeCount})`
+                        : `Total Envelopes (${profileData.totalEnvelopeCount})`}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Filter quick-toggle tabs */}
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilter("unread")}
+                      className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${
+                        activeFilter === "unread"
+                          ? "bg-amber-400 text-stone-950 font-bold shadow-xs"
+                          : "bg-[#FAF7F2] dark:bg-[#1E0F2E] text-[#7C7069] dark:text-[#A8988B] hover:text-[#2C1E16]"
+                      }`}
+                    >
+                      {locale === "bn" ? "অপঠিত" : "Unread"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilter("all")}
+                      className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${
+                        activeFilter === "all"
+                          ? "bg-amber-400 text-stone-950 font-bold shadow-xs"
+                          : "bg-[#FAF7F2] dark:bg-[#1E0F2E] text-[#7C7069] dark:text-[#A8988B] hover:text-[#2C1E16]"
+                      }`}
+                    >
+                      {locale === "bn" ? "সকল" : "All"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilter(null)}
+                      className="w-7 h-7 rounded-full hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center text-[#7C7069] hover:text-[#D9534F] transition-colors ml-1"
+                      title="Close Tile View"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                {filteredLetters.length === 0 ? (
+                  <div className="py-8 text-center space-y-2">
+                    <Mailbox size={32} className="mx-auto text-[#A8988B]" />
+                    <p className="text-xs text-[#7C7069] dark:text-[#A8988B]">
+                      {activeFilter === "unread"
+                        ? locale === "bn"
+                          ? "কোনো অপঠিত চিঠি নেই।"
+                          : "No unread letters at the moment."
+                        : locale === "bn"
+                        ? "এখনো কোনো চিঠি আসেনি।"
+                        : "No letters received yet."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredLetters.map((ltr) => (
+                      <EnvelopeCard
+                        key={ltr.id}
+                        letter={ltr}
+                        onClick={() => handleOpenLetter(ltr.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. Public Mailbox URL Card (One-Tap Copy) */}
             <div className="relative p-6 sm:p-7 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl space-y-3 overflow-hidden transition-colors">
               <div className="absolute -top-2 left-10 w-24 h-5 washi-tape-buttercup rounded-sm pointer-events-none" />
 
@@ -355,31 +628,16 @@ export default function ProfilePage() {
               <CopyField value={publicUrl} />
             </div>
 
-            {/* 4. Action Controls Section (Open Inbox, Passcode, Disconnect) */}
+            {/* 5. Bottom Action Controls Section (Passcode Info & Disconnect Mailbox) */}
             <div className="p-6 sm:p-7 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl space-y-4 transition-colors">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                {/* Primary Action: Open Secret Inbox */}
-                <Link
-                  href={`/inbox/${profileData.username}`}
-                  className="flex-1"
-                >
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="w-full rounded-full gap-2 font-semibold shadow-sm bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] border border-[#F0D59E]"
-                  >
-                    <Mail size={18} strokeWidth={1.5} />
-                    <span>{t("profile.actions.openInbox")}</span>
-                  </Button>
-                </Link>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Secondary Action 1: 6-Digit Passcode Info Modal */}
                 <Button
                   type="button"
                   variant="outline"
                   size="lg"
                   onClick={() => setIsPasscodeModalOpen(true)}
-                  className="rounded-full border-[#F0E2D2] dark:border-[#351D4D] hover:bg-[#FAF7F2] dark:hover:bg-[#1E0F2E] text-[#2C1E16] dark:text-[#FFF8F0] gap-2 text-xs sm:text-sm font-medium"
+                  className="w-full rounded-full border-[#F0E2D2] dark:border-[#351D4D] hover:bg-[#FAF7F2] dark:hover:bg-[#1E0F2E] text-[#2C1E16] dark:text-[#FFF8F0] gap-2 text-xs sm:text-sm font-medium"
                 >
                   <KeyRound size={16} className="text-[#E88B60]" />
                   <span>{t("profile.actions.passcodeInfo")}</span>
@@ -391,7 +649,7 @@ export default function ProfilePage() {
                   variant="secondary"
                   size="lg"
                   onClick={() => setIsDisconnectModalOpen(true)}
-                  className="rounded-full bg-[#FAF7F2] dark:bg-[#1E0F2E] hover:bg-[#EBE3D5] dark:hover:bg-[#2B143D] text-[#D9534F] border border-[#F0E2D2] dark:border-[#351D4D] gap-2 text-xs sm:text-sm font-medium"
+                  className="w-full rounded-full bg-[#FAF7F2] dark:bg-[#1E0F2E] hover:bg-[#EBE3D5] dark:hover:bg-[#2B143D] text-[#D9534F] border border-[#F0E2D2] dark:border-[#351D4D] gap-2 text-xs sm:text-sm font-medium"
                 >
                   <LogOut size={16} strokeWidth={1.5} />
                   <span>{t("profile.actions.disconnect")}</span>
@@ -401,6 +659,19 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Full Letter Reader Modal */}
+      <LetterReader
+        letter={activeLetter}
+        isOpen={isReaderOpen}
+        onClose={() => setIsReaderOpen(false)}
+        onReact={handleReactToLetter}
+        onDelete={handleDeleteLetter}
+        onPublish={handlePublishLetter}
+        onDownloadPostcard={handleDownloadPostcard}
+        onReport={handleReportLetter}
+        username={activeUsername || ""}
+      />
 
       {/* Passcode Security Information Modal */}
       <PasscodeInfoModal

@@ -83,20 +83,20 @@ export function ProfileHeaderCard({
           </div>
         </div>
 
-        {/* Authoritative Live Countdown Box in Warm Buttercup Pastel */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-[#FEF3C7] dark:bg-[#251338] border border-[#FDE68A] dark:border-[#4A286D] flex flex-col sm:items-end justify-center shadow-sm min-w-[200px]">
-          <div className="flex items-center gap-1.5 text-xs font-mono text-[#7C7069] dark:text-[#A8988B] uppercase tracking-wider mb-1">
+        {/* Authoritative Live Countdown Box - Perfectly Center-Aligned */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#FEF3C7] dark:bg-[#251338] border border-[#FDE68A] dark:border-[#4A286D] flex flex-col items-center justify-center text-center shadow-sm min-w-[180px] sm:min-w-[200px]">
+          <div className="flex items-center justify-center gap-1.5 text-xs font-mono text-[#7C7069] dark:text-[#A8988B] uppercase tracking-wider mb-1 text-center">
             <Clock size={14} className="text-[#E88B60]" />
             <span>{t("profile.timeLeft")}</span>
           </div>
-          <div className="text-xl sm:text-2xl font-serif font-bold text-[#2C1E16] dark:text-[#FFF8F0] tracking-tight">
+          <div className="text-xl sm:text-2xl font-serif font-bold text-[#2C1E16] dark:text-[#FFF8F0] tracking-wider text-center my-1">
             {countdown.isExpired ? (
               <span className="text-[#D9534F]">{t("profile.statusExpired")}</span>
             ) : (
               countdown.formatted
             )}
           </div>
-          <div className="text-[11px] text-[#7C7069] dark:text-[#A8988B] flex items-center gap-1 mt-0.5">
+          <div className="text-[11px] text-[#7C7069] dark:text-[#A8988B] flex items-center justify-center gap-1 text-center mt-0.5">
             <Sparkles size={11} className="text-[#E88B60]" />
             <span>{t("profile.expiresIn")} {countdown.formatted}</span>
           </div>

@@ -11,6 +11,8 @@ export interface ProfileStatsGridProps {
   unreadCount: number;
   totalEnvelopeCount: number;
   acceptsBottles: boolean;
+  activeFilter?: "unread" | "all" | null;
+  onFilterChange?: (filter: "unread" | "all") => void;
 }
 
 export function ProfileStatsGrid({
@@ -18,6 +20,8 @@ export function ProfileStatsGrid({
   unreadCount,
   totalEnvelopeCount,
   acceptsBottles,
+  activeFilter = null,
+  onFilterChange,
 }: ProfileStatsGridProps) {
   const { locale, t } = useLocale();
 
@@ -28,8 +32,23 @@ export function ProfileStatsGrid({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-      {/* Stat 1: Unread Envelopes (Lavender) */}
-      <div className="relative p-5 sm:p-6 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl flex flex-col justify-between overflow-hidden transition-colors">
+      {/* Stat 1: Unread Envelopes (Lavender) - Interactive Card */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onFilterChange?.("unread")}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onFilterChange?.("unread");
+          }
+        }}
+        className={`relative p-5 sm:p-6 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] shadow-xl flex flex-col justify-between overflow-hidden cursor-pointer hover:border-amber-400/50 hover:bg-white/[0.03] active:scale-[0.99] transition-all duration-200 select-none ${
+          activeFilter === "unread"
+            ? "border-2 border-amber-400 ring-2 ring-amber-400/40 bg-amber-500/5 dark:bg-amber-400/10"
+            : "border border-[#F0E2D2] dark:border-[#351D4D]"
+        }`}
+      >
         <div className="absolute -top-2 left-6 w-16 h-4 washi-tape-lavender rounded-sm pointer-events-none" />
 
         <div className="flex items-start justify-between gap-4 mb-4">
@@ -54,8 +73,23 @@ export function ProfileStatsGrid({
         </div>
       </div>
 
-      {/* Stat 2: Total Envelopes (Sky Mist) */}
-      <div className="relative p-5 sm:p-6 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl flex flex-col justify-between overflow-hidden transition-colors">
+      {/* Stat 2: Total Envelopes (Sky Mist) - Interactive Card */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onFilterChange?.("all")}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onFilterChange?.("all");
+          }
+        }}
+        className={`relative p-5 sm:p-6 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] shadow-xl flex flex-col justify-between overflow-hidden cursor-pointer hover:border-amber-400/50 hover:bg-white/[0.03] active:scale-[0.99] transition-all duration-200 select-none ${
+          activeFilter === "all"
+            ? "border-2 border-amber-400 ring-2 ring-amber-400/40 bg-amber-500/5 dark:bg-amber-400/10"
+            : "border border-[#F0E2D2] dark:border-[#351D4D]"
+        }`}
+      >
         <div className="absolute -top-2 left-6 w-16 h-4 washi-tape-skymist rounded-sm pointer-events-none" />
 
         <div className="flex items-start justify-between gap-4 mb-4">
