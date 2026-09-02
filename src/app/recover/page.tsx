@@ -128,8 +128,7 @@ export default function RecoverPage() {
           </p>
         </div>
 
-        <div className="border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] p-6 sm:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute -top-3 right-8 w-24 h-5 washi-tape-buttercup rounded-sm pointer-events-none" />
+        <div className="border border-[#F0E2D2] dark:border-white/10 rounded-2xl sm:rounded-3xl bg-[#FFFDF9] dark:bg-[#120d1d] p-6 sm:p-8 shadow-xl relative">
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">

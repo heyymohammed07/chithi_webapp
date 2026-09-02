@@ -199,3 +199,35 @@ export async function reportContent(
 
   return { reported: true };
 }
+
+export async function publishDirectToFeed(
+  body: string,
+  paper: any,
+  stamp: any
+): Promise<{ feedId: string }> {
+  const redis = getRedis();
+  const feedId = generateFeedId();
+  const now = Date.now();
+
+  const feedRecord: FeedRecord = {
+    id: feedId,
+    body,
+    paper,
+    stamp,
+    createdAt: now,
+    hearts: 0,
+    heartCracks: 0,
+    version: 1,
+  };
+
+  const pipeline = redis.pipeline();
+  pipeline.set(keys.feedItem(feedId), JSON.stringify(feedRecord), { ex: FEED_TTL_S });
+  pipeline.zadd(keys.feedIds(), { score: now, member: feedId });
+  pipeline.zadd(keys.feedTrending(), { score: 0, member: feedId });
+  pipeline.expire(keys.feedIds(), FEED_TTL_S);
+  pipeline.expire(keys.feedTrending(), FEED_TTL_S);
+  await pipeline.exec();
+
+  return { feedId };
+}
+

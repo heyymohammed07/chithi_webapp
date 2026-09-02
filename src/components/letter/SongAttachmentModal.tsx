@@ -1,14 +1,21 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useLocale } from "@/hooks/useLocale";
-import { AttachedSong, DEFAULT_RADIO_SONG } from "@/lib/music";
+import { AttachedSong } from "@/lib/music";
 import { getThumbnailUrl } from "@/hooks/useGlobalAudio";
-import { Search, Check, Sparkles, Disc } from "lucide-react";
+import { Search, Check, Sparkles, Disc, Play, Square, Loader2 } from "lucide-react";
+
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: (() => void) | undefined;
+  }
+}
 
 export interface SongAttachmentModalProps {
   isOpen: boolean;
@@ -47,17 +54,116 @@ export function SongAttachmentModal({
 }: SongAttachmentModalProps) {
   const { locale } = useLocale();
   const [query, setQuery] = useState("");
-  const [songs, setSongs] = useState<AttachedSong[]>([DEFAULT_RADIO_SONG]);
+  const [songs, setSongs] = useState<AttachedSong[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // 20-second preview state
+  const [previewingSongId, setPreviewingSongId] = useState<string | null>(null);
+  const [previewSecondsLeft, setPreviewSecondsLeft] = useState<number>(20);
+  const [isPreviewBuffering, setIsPreviewBuffering] = useState<boolean>(false);
+
+  const previewPlayerRef = useRef<any>(null);
+  const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Stop active preview helper
+  const stopActivePreview = useCallback(() => {
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    if (previewPlayerRef.current) {
+      try {
+        previewPlayerRef.current.pauseVideo?.();
+        previewPlayerRef.current.stopVideo?.();
+      } catch {}
+    }
+    setPreviewingSongId(null);
+    setPreviewSecondsLeft(20);
+    setIsPreviewBuffering(false);
+  }, []);
+
+  // Initialize background YouTube iframe player for modal preview
+  useEffect(() => {
+    if (!isOpen) {
+      stopActivePreview();
+      return;
+    }
+
+    const initPreviewPlayer = () => {
+      if (!window.YT || typeof window.YT.Player !== "function") return;
+      if (previewPlayerRef.current) return;
+
+      const mountEl = document.getElementById("preview-yt-mount");
+      if (!mountEl) return;
+
+      try {
+        previewPlayerRef.current = new window.YT.Player("preview-yt-mount", {
+          height: "100",
+          width: "100",
+          playerVars: {
+            autoplay: 0,
+            controls: 0,
+            disablekb: 1,
+            enablejsapi: 1,
+            fs: 0,
+            rel: 0,
+          },
+          events: {
+            onStateChange: (event: any) => {
+              if (event.data === 1) {
+                // Playing
+                setIsPreviewBuffering(false);
+              } else if (event.data === 3) {
+                // Buffering
+                setIsPreviewBuffering(true);
+              } else if (event.data === 0) {
+                // Ended
+                stopActivePreview();
+              }
+            },
+            onError: () => {
+              stopActivePreview();
+            },
+          },
+        });
+      } catch (err) {
+        console.warn("[Preview Player init error]", err);
+      }
+    };
+
+    if (window.YT && typeof window.YT.Player === "function") {
+      initPreviewPlayer();
+    } else {
+      if (!document.getElementById("yt-iframe-api-script")) {
+        const tag = document.createElement("script");
+        tag.id = "yt-iframe-api-script";
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(tag);
+      }
+      const checkInterval = setInterval(() => {
+        if (window.YT && typeof window.YT.Player === "function") {
+          clearInterval(checkInterval);
+          initPreviewPlayer();
+        }
+      }, 250);
+      return () => clearInterval(checkInterval);
+    }
+  }, [isOpen, stopActivePreview]);
+
+  // Real-Time Keystroke Search with 300ms debounce
   useEffect(() => {
     if (!isOpen) return;
 
     setLoading(true);
     const timeout = setTimeout(async () => {
       try {
-        const searchQuery = query.trim() || "classic bangla song";
-        const res = await fetch(`/api/music/search?q=${encodeURIComponent(searchQuery)}`);
+        const trimmed = query.trim();
+        const res = await fetch(`/api/music/search?q=${encodeURIComponent(trimmed)}`);
         const json = await res.json();
         if (json.ok && json.data?.songs) {
           setSongs(json.data.songs);
@@ -67,32 +173,93 @@ export function SongAttachmentModal({
       } finally {
         setLoading(false);
       }
-    }, query.trim() ? 350 : 0);
+    }, query.trim() ? 300 : 0);
 
     return () => clearTimeout(timeout);
   }, [query, isOpen]);
 
+  // Toggle 20s Audio Preview
+  const handleTogglePreview = (e: React.MouseEvent, song: AttachedSong) => {
+    e.stopPropagation();
+
+    // If already playing this song, stop it
+    if (previewingSongId === song.youtubeId) {
+      stopActivePreview();
+      return;
+    }
+
+    // Stop any existing preview first
+    stopActivePreview();
+
+    setPreviewingSongId(song.youtubeId);
+    setPreviewSecondsLeft(20);
+    setIsPreviewBuffering(true);
+
+    if (previewPlayerRef.current) {
+      try {
+        previewPlayerRef.current.unMute?.();
+        previewPlayerRef.current.setVolume?.(80);
+        previewPlayerRef.current.loadVideoById({
+          videoId: song.youtubeId,
+          startSeconds: 10, // Start 10s in to skip silent intro
+        });
+        previewPlayerRef.current.playVideo?.();
+      } catch (err) {
+        console.warn("[Preview play error]", err);
+      }
+    }
+
+    // 1-second interval for countdown badge
+    countdownIntervalRef.current = setInterval(() => {
+      setPreviewSecondsLeft((prev) => {
+        if (prev <= 1) {
+          stopActivePreview();
+          return 20;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Auto-stop after exactly 20 seconds
+    previewTimerRef.current = setTimeout(() => {
+      stopActivePreview();
+    }, 20000);
+  };
+
   const handleSelect = (song: AttachedSong) => {
+    stopActivePreview();
     onSelectSong(song);
+    onClose();
+  };
+
+  const handleClose = () => {
+    stopActivePreview();
     onClose();
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
-      title={locale === "bn" ? "গান যুক্ত করুন" : "Attach a Song"}
+      onClose={handleClose}
+      title={locale === "bn" ? "চিঠির গান নির্বাচন" : "Select Background Song"}
       maxWidth="max-w-lg"
     >
       <div className="space-y-4 pt-2">
+        {/* Invisible mount for YouTube preview playback */}
+        <div
+          id="preview-yt-mount"
+          className="fixed bottom-0 right-0 w-1 h-1 pointer-events-none opacity-[0.01] overflow-hidden -z-20"
+          aria-hidden="true"
+        />
+
         {/* Subtitle Description */}
         <p className="text-xs text-[#857367] dark:text-[#A592A4] font-serif italic">
           {locale === "bn"
-            ? "চিঠির সাথে একটি গান যুক্ত করুন যা প্রাপকের পড়ার সময় বাজবে।"
-            : "Attach a soundtrack to play while the recipient reads your letter."}
+            ? "চিঠির সাথে একটি গান যুক্ত করুন যা প্রাপকের পড়ার সময় বাজবে (২০ সেকেন্ড প্রিভিউ শুনে নিন)।"
+            : "Attach a soundtrack to play while the recipient reads your letter (listen to a 20s preview)."}
         </p>
 
-        {/* Search Bar */}
+        {/* Real-Time Keystroke Search Input */}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#857367] dark:text-[#A592A4]">
             <Search size={18} />
@@ -100,8 +267,8 @@ export function SongAttachmentModal({
           <Input
             placeholder={
               locale === "bn"
-                ? "গানের নাম বা শিল্পীর নাম দিয়ে খুঁজুন..."
-                : "Search classic songs or artists..."
+                ? "গানের নাম বা শিল্পীর নাম লিখুন (যেমন: মেঘদল, অর্ণব, হাবিব)..."
+                : "Type song or artist name (real-time search)..."
             }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -109,11 +276,11 @@ export function SongAttachmentModal({
           />
         </div>
 
-        {/* Dynamic Songs List */}
+        {/* Dynamic Songs List with 20s Preview Engine */}
         <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-          {loading ? (
+          {loading && songs.length === 0 ? (
             <div className="py-8 text-center text-xs font-mono text-[#857367] dark:text-[#A592A4] animate-pulse">
-              {locale === "bn" ? "গান খোঁজা হচ্ছে..." : "Searching YouTube Music tracks..."}
+              {locale === "bn" ? "গান খোঁজা হচ্ছে..." : "Searching tracks..."}
             </div>
           ) : songs.length === 0 ? (
             <div className="py-8 text-center text-xs text-[#857367] dark:text-[#A592A4]">
@@ -122,41 +289,79 @@ export function SongAttachmentModal({
           ) : (
             songs.map((song) => {
               const isSelected = currentSong?.youtubeId === song.youtubeId;
+              const isPreviewing = previewingSongId === song.youtubeId;
+
               return (
-                <button
+                <div
                   key={song.youtubeId || song.id}
-                  type="button"
                   onClick={() => handleSelect(song)}
                   className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left group cursor-pointer ${
                     isSelected
                       ? "bg-[#FFE5B4]/60 dark:bg-[#351D4D] border-[#E88B60] shadow-sm"
+                      : isPreviewing
+                      ? "bg-[#FFF8F0] dark:bg-[#251338] border-[#E88B60]/80 shadow-md ring-1 ring-[#E88B60]"
                       : "bg-[#FFFDF9] dark:bg-[#170A24] border-[#F0E2D2] dark:border-[#351D4D]/60 hover:border-[#E88B60]/60 hover:bg-[#FFF8F0] dark:hover:bg-[#231235]"
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {/* Thumbnail */}
                     <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#F0E2D2] dark:border-[#351D4D] relative bg-[#FFE5B4]/30 flex items-center justify-center">
                       <SongThumbnail song={song} />
                     </div>
-                    <div className="min-w-0">
+
+                    {/* Metadata & Preview Indicator */}
+                    <div className="min-w-0 flex-1">
                       <div className="text-sm font-serif font-bold text-[#382A22] dark:text-[#FFF8F0] truncate group-hover:text-[#E88B60] transition-colors">
                         {song.title}
                       </div>
-                      <div className="text-xs text-[#857367] dark:text-[#A592A4] truncate">
-                        {song.artist}
+                      <div className="flex items-center gap-2 text-xs text-[#857367] dark:text-[#A592A4] truncate">
+                        <span>{song.artist}</span>
+                        {isPreviewing && (
+                          <span className="inline-flex items-center gap-1 font-mono text-[10px] text-[#E88B60] font-bold animate-pulse">
+                            • {isPreviewBuffering ? "Buffering..." : `Preview (${previewSecondsLeft}s)`}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {isSelected ? (
-                    <div className="w-7 h-7 rounded-full bg-[#E88B60] text-white flex items-center justify-center shrink-0 shadow-sm">
-                      <Check size={14} strokeWidth={2.5} />
-                    </div>
-                  ) : (
-                    <div className="text-xs font-mono text-[#857367] dark:text-[#A592A4] group-hover:text-[#E88B60] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {locale === "bn" ? "নির্বাচন" : "Select"}
-                    </div>
-                  )}
-                </button>
+                  {/* Actions Right: 20s Preview Button + Selection Tick */}
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {/* 20s Preview Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleTogglePreview(e, song)}
+                      aria-label={isPreviewing ? "Stop Preview" : "Preview 20s"}
+                      title={isPreviewing ? "Stop Preview" : "Play 20s Preview"}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                        isPreviewing
+                          ? "bg-[#E88B60] text-white shadow-sm scale-105"
+                          : "bg-[#FFE5B4]/70 dark:bg-[#351D4D] text-[#857367] dark:text-[#A592A4] hover:text-[#382A22] dark:hover:text-[#FFF8F0] hover:bg-[#FFE5B4]"
+                      }`}
+                    >
+                      {isPreviewing ? (
+                        isPreviewBuffering ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Square size={11} fill="currentColor" />
+                        )
+                      ) : (
+                        <Play size={12} fill="currentColor" className="ml-0.5" />
+                      )}
+                    </button>
+
+                    {/* Selection State */}
+                    {isSelected ? (
+                      <div className="w-7 h-7 rounded-full bg-[#E88B60] text-white flex items-center justify-center shadow-sm">
+                        <Check size={14} strokeWidth={2.5} />
+                      </div>
+                    ) : (
+                      <div className="text-xs font-mono text-[#857367] dark:text-[#A592A4] group-hover:text-[#E88B60] opacity-0 group-hover:opacity-100 transition-opacity">
+                        {locale === "bn" ? "যুক্ত করুন" : "Select"}
+                      </div>
+                    )}
+                  </div>
+                </div>
               );
             })
           )}
@@ -166,9 +371,9 @@ export function SongAttachmentModal({
         <div className="flex items-center justify-between pt-3 border-t border-[#F0E2D2] dark:border-[#351D4D]">
           <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#857367] dark:text-[#A592A4]">
             <Sparkles size={12} className="text-[#E88B60]" />
-            <span>{locale === "bn" ? "অফিসিয়াল স্টুডিও অডিও" : "Official Studio Audio"}</span>
+            <span>{locale === "bn" ? "রিয়েল-টাইম সার্চ ও ২০ সে. প্রিভিউ" : "Real-time search & 20s preview"}</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={handleClose}>
             {locale === "bn" ? "বাতিল" : "Cancel"}
           </Button>
         </div>

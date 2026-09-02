@@ -7,6 +7,7 @@ import { generateLetterId } from "./ids";
 import { toPlainText, hasExcessivelyLongWord } from "./sanitize";
 import { ApiError } from "./api";
 import { purgeInactiveMailbox } from "./mailbox";
+import { publishDirectToFeed } from "./feed";
 
 /**
  * Matches an active, eligible mailbox recipient for a Message in a Bottle.
@@ -166,6 +167,14 @@ export async function sendBottle(
   pipeline.incr(keys.mailboxUnread(recipient));
 
   await pipeline.exec();
+
+  if (input.isPublic) {
+    try {
+      await publishDirectToFeed(cleanBody, input.paper as PaperStyleId, input.stamp as StampId);
+    } catch (err) {
+      console.warn("[sendBottle] Failed to publish public feed item", err);
+    }
+  }
 
   return { delivered: true };
 }

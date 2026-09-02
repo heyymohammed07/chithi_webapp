@@ -18,7 +18,7 @@ import { AttachedSong } from "@/lib/music";
 import { LETTER_BODY_MAX } from "@/lib/constants";
 import { useToast } from "@/hooks/useToast";
 import { useLocale } from "@/hooks/useLocale";
-import { Music, X, User, EyeOff, Mailbox } from "lucide-react";
+import { Music, X, User, EyeOff, Mailbox, Globe, Lock } from "lucide-react";
 
 export interface LetterComposerProps {
   recipientUsername?: string;
@@ -75,6 +75,7 @@ export function LetterComposer({
 
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [senderName, setSenderName] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isSelfSending, setIsSelfSending] = useState(false);
 
@@ -147,6 +148,7 @@ export function LetterComposer({
             attachedSong: attachedSong || undefined,
             senderName: isAnonymous ? null : (senderName.trim() || null),
             isAnonymous,
+            isPublic,
           }),
         });
 
@@ -207,6 +209,7 @@ export function LetterComposer({
             attachedSong: attachedSong || undefined,
             senderName: isAnonymous ? null : (senderName.trim() || null),
             isAnonymous,
+            isPublic,
             mode: modePayload,
           }),
         });
@@ -261,14 +264,14 @@ export function LetterComposer({
       : "Write what you could never say in daylight...";
 
   return (
-    <form onSubmit={handleSubmit} className="w-full">
+    <form onSubmit={handleSubmit} className="w-full pb-36 sm:pb-40">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-        {/* Left Column: Direct-on-Paper Interactive Canvas */}
+        {/* Step 1. Writing Paper (Left Canvas on Desktop, First on Mobile) */}
         <div className="lg:col-span-7 lg:sticky lg:top-24 space-y-3">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-mono uppercase tracking-wider text-[#857367] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#E88B60] animate-pulse" />
-              {locale === "bn" ? "চিঠির কাগজ (সরাসরি লিখুন)" : "Writing Paper (Type directly)"}
+              {locale === "bn" ? "১. চিঠির কাগজ (সরাসরি লিখুন)" : "1. Writing Paper (Type directly)"}
             </span>
             <CharCounter text={body} maxChars={LETTER_BODY_MAX} />
           </div>
@@ -292,13 +295,13 @@ export function LetterComposer({
           </div>
         </div>
 
-        {/* Right Column: Controls & Stationery Options */}
+        {/* Right Column: Reordered Top-Down Options */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Target for Bottle mode */}
+          {/* Step 2. Target Preference (For Bottle Mode) */}
           {isBottleMode && (
             <div className="space-y-2 p-5 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]">
               <label className="block text-xs font-mono uppercase tracking-wider text-[#857367] dark:text-[#C5B3A6]">
-                {t("bottle.targetLabel")}
+                {locale === "bn" ? "২. প্রাপকের পছন্দ" : "2. Target Preference"}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {(["anyone", "male", "female"] as const).map((tgt) => (
@@ -324,17 +327,26 @@ export function LetterComposer({
             </div>
           )}
 
-          {/* Section 20: Song Attachment Control */}
+          {/* Step 3. Placement & Style Box (Paper, Font, Postal Stamp) */}
+          <div className="space-y-6 p-6 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]">
+            <PaperPicker selected={paper} onChange={setPaper} />
+            <div className="h-px bg-[#F0E2D2] dark:bg-[#351D4D]" />
+            <FontPicker selected={font} onChange={setFont} />
+            <div className="h-px bg-[#F0E2D2] dark:bg-[#351D4D]" />
+            <StampPicker selected={stamp} onChange={setStamp} />
+          </div>
+
+          {/* Step 4. Background Music (Song Selection Trigger) */}
           <div className="p-5 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Music size={16} className="text-[#E88B60]" />
                 <span className="text-xs font-serif font-bold text-[#382A22] dark:text-[#FFF8F0]">
-                  {locale === "bn" ? "চিঠির গান (ঐচ্ছিক)" : "Background Song (Optional)"}
+                  {locale === "bn" ? "৪. চিঠির গান (ঐচ্ছিক)" : "4. Background Music (Optional)"}
                 </span>
               </div>
               <span className="text-[10px] font-mono text-[#857367] dark:text-[#C5B3A6] uppercase tracking-wider">
-                {locale === "bn" ? "অ্যাকোস্টিক" : "Acoustic"}
+                {locale === "bn" ? "২০ সে. প্রিভিউ" : "20s Preview"}
               </span>
             </div>
 
@@ -356,7 +368,7 @@ export function LetterComposer({
                 <button
                   type="button"
                   onClick={() => setAttachedSong(null)}
-                  className="w-7 h-7 rounded-full hover:bg-white/60 dark:hover:bg-white/10 text-[#857367] dark:text-[#C5B3A6] hover:text-[#E88B60] flex items-center justify-center transition-colors shrink-0"
+                  className="w-7 h-7 rounded-full hover:bg-white/60 dark:hover:bg-white/10 text-[#857367] dark:text-[#C5B3A6] hover:text-[#E88B60] flex items-center justify-center transition-colors shrink-0 cursor-pointer"
                   aria-label="Remove Song"
                 >
                   <X size={15} />
@@ -376,27 +388,18 @@ export function LetterComposer({
             )}
           </div>
 
-          {/* Paper, Font, and Stamp Selectors */}
-          <div className="space-y-6 p-6 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]">
-            <PaperPicker selected={paper} onChange={setPaper} />
-            <div className="h-px bg-[#F0E2D2] dark:bg-[#351D4D]" />
-            <FontPicker selected={font} onChange={setFont} />
-            <div className="h-px bg-[#F0E2D2] dark:bg-[#351D4D]" />
-            <StampPicker selected={stamp} onChange={setStamp} />
-          </div>
-
-          {/* Hints Field */}
+          {/* Step 5. Sender Hints (Optional) */}
           <div className="p-6 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]">
             <HintFields hints={hints} onChange={setHints} />
           </div>
 
-          {/* Sender Identity Section (Anonymous vs Named) */}
+          {/* Step 6. Sender Identity (Anonymous vs Show My Name) */}
           <div className="p-5 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <User size={16} className="text-[#E88B60]" />
                 <span className="text-xs font-serif font-bold text-[#382A22] dark:text-[#FFF8F0]">
-                  {locale === "bn" ? "প্রেরকের পরিচয়" : "Sender Identity"}
+                  {locale === "bn" ? "৬. প্রেরকের পরিচয়" : "6. Sender Identity"}
                 </span>
               </div>
               <span className="text-[10px] font-mono text-[#857367] dark:text-[#C5B3A6] uppercase tracking-wider">
@@ -408,7 +411,7 @@ export function LetterComposer({
               <button
                 type="button"
                 onClick={() => setIsAnonymous(true)}
-                className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   isAnonymous
                     ? "bg-[#FFE5B4] border-[#FCD34D] text-[#382A22] ring-1 ring-[#FCD34D] font-bold shadow-xs"
                     : "bg-[#FFFDF9] dark:bg-[#1E0F2E] border-[#F0E2D2] dark:border-[#351D4D] text-[#857367] dark:text-[#C5B3A6] hover:text-[#382A22] dark:hover:text-[#FFF8F0]"
@@ -421,7 +424,7 @@ export function LetterComposer({
               <button
                 type="button"
                 onClick={() => setIsAnonymous(false)}
-                className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   !isAnonymous
                     ? "bg-[#FFE5B4] border-[#FCD34D] text-[#382A22] ring-1 ring-[#FCD34D] font-bold shadow-xs"
                     : "bg-[#FFFDF9] dark:bg-[#1E0F2E] border-[#F0E2D2] dark:border-[#351D4D] text-[#857367] dark:text-[#C5B3A6] hover:text-[#382A22] dark:hover:text-[#FFF8F0]"
@@ -459,6 +462,55 @@ export function LetterComposer({
             </p>
           </div>
 
+          {/* Step 7. Benami Kham (বেনামী খাম) Public Wall Option */}
+          <div className="p-5 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe size={16} className="text-[#E88B60]" />
+                <span className="text-xs font-serif font-bold text-[#382A22] dark:text-[#FFF8F0]">
+                  {locale === "bn" ? "৭. বেনামী খামে প্রকাশ করুন" : "7. Post to Benami Kham (বেনামী খাম)"}
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-[#857367] dark:text-[#C5B3A6] uppercase tracking-wider">
+                {isPublic ? (locale === "bn" ? "পাবলিক ফিড" : "Public Feed") : (locale === "bn" ? "ব্যক্তিগত" : "Private")}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-[#857367] dark:text-[#C5B3A6] leading-relaxed">
+              {locale === "bn"
+                ? "চিঠিটি সবার জন্য উন্মুক্ত বেনামী খাম দেওয়ালে ৪৮ ঘণ্টার জন্য শেয়ার করুন অথবা কেবল সরাসরি ইনবক্সে রাখুন।"
+                : "Share this letter to the public 48h ephemeral wall or keep it strictly direct."}
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsPublic(false)}
+                className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  !isPublic
+                    ? "bg-[#FFE5B4] border-[#FCD34D] text-[#382A22] ring-1 ring-[#FCD34D] font-bold shadow-xs"
+                    : "bg-[#FFFDF9] dark:bg-[#1E0F2E] border-[#F0E2D2] dark:border-[#351D4D] text-[#857367] dark:text-[#C5B3A6] hover:text-[#382A22] dark:hover:text-[#FFF8F0]"
+                }`}
+              >
+                <Lock size={13} />
+                <span>{locale === "bn" ? "ব্যক্তিগত (শুধু ইনবক্স)" : "Private (Direct Only)"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPublic(true)}
+                className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isPublic
+                    ? "bg-[#FFE5B4] border-[#FCD34D] text-[#382A22] ring-1 ring-[#FCD34D] font-bold shadow-xs"
+                    : "bg-[#FFFDF9] dark:bg-[#1E0F2E] border-[#F0E2D2] dark:border-[#351D4D] text-[#857367] dark:text-[#C5B3A6] hover:text-[#382A22] dark:hover:text-[#FFF8F0]"
+                }`}
+              >
+                <Globe size={13} className="text-[#0284C7]" />
+                <span>{locale === "bn" ? "পাবলিক (বেনামী খাম)" : "Public (Benami Kham)"}</span>
+              </button>
+            </div>
+          </div>
+
           {/* Advanced Mode Panel (Direct letters only) */}
           {!isBottleMode && (
             <AdvancedModePanel
@@ -474,7 +526,7 @@ export function LetterComposer({
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full text-base py-3.5 rounded-full"
+              className="w-full text-base py-3.5 rounded-full shadow-lg"
               isLoading={isSending}
             >
               {isBottleMode ? t("bottle.sendButton") : t("composer.sendButton")}
@@ -483,20 +535,22 @@ export function LetterComposer({
         </div>
       </div>
 
-      {/* Mobile Sticky Bottom Action Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#FFF8F0]/95 dark:bg-[#0C0314]/95 border-t border-[#F0E2D2] dark:border-[#351D4D] backdrop-blur-md z-30 shadow-md">
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          className="w-full text-base py-3 rounded-full"
-          isLoading={isSending}
-        >
-          {isBottleMode ? t("bottle.sendButton") : t("composer.sendButton")}
-        </Button>
+      {/* Floating Action Bar (Mobile & Small Viewports) with Zero Footer Overlap */}
+      <div className="lg:hidden fixed bottom-4 left-0 right-0 z-40 px-4 max-w-lg mx-auto pointer-events-none">
+        <div className="p-2 rounded-full bg-[#FFF8F0]/90 dark:bg-[#0C0314]/90 border border-[#F0E2D2]/80 dark:border-[#351D4D]/80 backdrop-blur-md shadow-2xl">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full text-base py-3 rounded-full pointer-events-auto shadow-md"
+            isLoading={isSending}
+          >
+            {isBottleMode ? t("bottle.sendButton") : t("composer.sendButton")}
+          </Button>
+        </div>
       </div>
 
-      {/* Song Attachment Search Modal */}
+      {/* Song Attachment Search Modal with 20s Audio Preview Engine */}
       <SongAttachmentModal
         isOpen={isMusicModalOpen}
         onClose={() => setIsMusicModalOpen(false)}

@@ -132,7 +132,7 @@ export function PaperSurface({
       )}
 
       {/* Direct-On-Paper Interactive Writing Area or Static Render */}
-      <div className={`relative z-0 text-[1.125rem] ${lineHeightClass}`}>
+      <div className={`relative z-0 text-[1.125rem] ${lineHeightClass} ${stamp ? "pr-16 sm:pr-20" : ""}`}>
         {isEditable ? (
           <textarea
             ref={textareaRef}

@@ -294,11 +294,11 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                {/* Live Countdown Pill in Warm Buttercup Pastel */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-[#FEF3C7]/80 dark:bg-[#2B1B38] border border-[#FDE68A] dark:border-[#52336B] flex flex-col sm:items-end justify-center shadow-sm min-w-[210px]">
-                  <div className="flex items-center gap-1.5 text-xs font-mono text-[#7C7069] dark:text-[#A592A4] uppercase tracking-wider mb-1">
+                {/* Live Countdown Pill Center-Aligned */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#FEF3C7]/80 dark:bg-[#2B1B38] border border-[#FDE68A] dark:border-[#52336B] flex flex-col items-center justify-center text-center mx-auto w-full py-4 shadow-sm min-w-[210px]">
+                  <div className="flex items-center justify-center gap-1.5 text-xs font-mono text-[#7C7069] dark:text-[#A592A4] uppercase tracking-wider mb-1">
                     <Clock size={14} className="text-[#D9534F]" />
-                    <span>{locale === "bn" ? "সময় বাকি:" : "Time Left:"}</span>
+                    <span>{locale === "bn" ? "সময় বাকি:" : "TIME LEFT:"}</span>
                   </div>
                   <div className="text-xl sm:text-2xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0] tracking-tight">
                     {countdown.formatted || "..."}

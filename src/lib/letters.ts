@@ -14,6 +14,7 @@ import { toPlainText, hasExcessivelyLongWord } from "./sanitize";
 import { hashRiddleAnswer, timingSafeEqual, sha256 } from "./crypto";
 import { ApiError } from "./api";
 import { purgeInactiveMailbox } from "./mailbox";
+import { publishDirectToFeed } from "./feed";
 
 export async function sendLetter(
   input: SendLetterInput,
@@ -135,8 +136,16 @@ export async function sendLetter(
   pipeline.expire(keys.mailboxLetters(recipientLower), remainingSeconds);
   pipeline.incr(keys.mailboxUnread(recipientLower));
   pipeline.set(floodKey, bodyHash, { ex: 600 }); // 10m flood guard
-
   await pipeline.exec();
+
+  // If user opted into Benami Kham (Public Wall), publish feed item
+  if (input.isPublic) {
+    try {
+      await publishDirectToFeed(cleanBody, input.paper as PaperStyleId, input.stamp as StampId);
+    } catch (err) {
+      console.warn("[sendLetter] Failed to publish public feed item", err);
+    }
+  }
 
   return { id: letterId };
 }

@@ -105,6 +105,7 @@ export const SendLetterSchema = z
     attachedSong: AttachedSongSchema,
     senderName: z.string().trim().max(50).optional().nullable(),
     isAnonymous: z.boolean().default(true),
+    isPublic: z.boolean().default(false),
     mode: z.discriminatedUnion("kind", [
       z.object({ kind: z.literal("none") }),
       z.object({
@@ -158,6 +159,7 @@ export const SendBottleSchema = z
     attachedSong: AttachedSongSchema,
     senderName: z.string().trim().max(50).optional().nullable(),
     isAnonymous: z.boolean().default(true),
+    isPublic: z.boolean().default(false),
   })
   .strict();
 
