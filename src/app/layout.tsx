@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { fontVariables } from "./fonts";
 import "./globals.css";
 import { LocaleProvider } from "@/i18n/provider";
@@ -51,6 +52,7 @@ export default function RootLayout({
           </LocaleProvider>
         </ThemeProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
