@@ -1,0 +1,104 @@
+import localFont from "next/font/local";
+import {
+  Fraunces,
+  Plus_Jakarta_Sans,
+  Caveat,
+  Dancing_Script,
+  Homemade_Apple,
+  Courier_Prime,
+  Hind_Siliguri,
+  Noto_Serif_Bengali,
+} from "next/font/google";
+
+// Headings & Display: Fraunces (warm, organic, human curves)
+export const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-display",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
+// UI Body & Buttons: Plus Jakarta Sans (warm, clean, modern feel)
+export const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-ui",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
+// Bengali UI Fallback
+export const hindSiliguri = Hind_Siliguri({
+  subsets: ["bengali"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-bn-ui",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
+// Bengali Book Print / Classic Serif Fallback
+export const notoSerifBengali = Noto_Serif_Bengali({
+  subsets: ["bengali"],
+  weight: ["400", "600", "700"],
+  variable: "--font-bn-paper",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
+// English Cursive & Handwriting
+export const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-hand",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
+export const dancingScript = Dancing_Script({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-calligraphy",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
+export const homemadeApple = Homemade_Apple({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-pencil",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
+export const courierPrime = Courier_Prime({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-mono-paper",
+  display: "swap",
+  adjustFontFallback: true,
+});
+
+// Local Bengali Handwriting Fonts
+export const bnHandwriting1 = localFont({
+  src: "../../public/fonts/bensen-handwriting.ttf",
+  variable: "--font-bn-hand-1",
+  display: "swap",
+  fallback: ["Noto Serif Bengali", "serif"],
+});
+
+export const bnHandwriting2 = localFont({
+  src: "../../public/fonts/kornofuli-handwriting.ttf",
+  variable: "--font-bn-hand-2",
+  display: "swap",
+  fallback: ["Hind Siliguri", "sans-serif"],
+});
+
+export const bnHandwriting3 = localFont({
+  src: "../../public/fonts/solpic-handwriting.ttf",
+  variable: "--font-bn-hand-3",
+  display: "swap",
+  fallback: ["Hind Siliguri", "cursive", "sans-serif"],
+});
+
+export const fontVariables = `${fraunces.variable} ${plusJakartaSans.variable} ${hindSiliguri.variable} ${notoSerifBengali.variable} ${caveat.variable} ${dancingScript.variable} ${homemadeApple.variable} ${courierPrime.variable} ${bnHandwriting1.variable} ${bnHandwriting2.variable} ${bnHandwriting3.variable}`;

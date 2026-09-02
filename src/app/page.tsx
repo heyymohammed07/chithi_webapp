@@ -1,0 +1,968 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { PageShell } from "@/components/layout/PageShell";
+import { MailboxKeyCard } from "@/components/inbox/MailboxKeyCard";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
+import { Badge } from "@/components/ui/Badge";
+import { useLocale } from "@/hooks/useLocale";
+import { useToast } from "@/hooks/useToast";
+import { useCountdown } from "@/hooks/useCountdown";
+import { DurationKey, Gender } from "@/lib/types";
+import { DURATIONS, USERNAME_REGEX } from "@/lib/constants";
+import {
+  ArrowRight,
+  CheckCircle,
+  XCircle,
+  Mail,
+  Send,
+  Scroll,
+  Waves,
+  KeyRound,
+  Sparkles,
+  Clock,
+  User,
+  Inbox,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { suggestUsernameFromName } from "@/lib/ids";
+import { PaperCutStamp, PostmarkSeal, AirmailTape, PaperScrap } from "@/components/ui/PaperCutSticker";
+
+interface CreatedMailboxState {
+  username: string;
+  accessToken: string;
+  recoveryPasscode: string;
+  expiresAt: number;
+  inboxUrl: string;
+  publicUrl: string;
+}
+
+export default function HomePage() {
+  const router = useRouter();
+  const { locale, t } = useLocale();
+  const { showToast } = useToast();
+
+  // Active session state
+  const [activeUser, setActiveUser] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<number>(0);
+  const [isSessionLoaded, setIsSessionLoaded] = useState(false);
+
+  // Guest tabs: "create" or "send"
+  const [activeTab, setActiveTab] = useState<"create" | "send">("create");
+
+  // Create Mailbox State
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
+  const [durationKey, setDurationKey] = useState<DurationKey>("24h");
+  const [gender, setGender] = useState<Gender>("unspecified");
+  const [availability, setAvailability] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdMailbox, setCreatedMailbox] = useState<CreatedMailboxState | null>(null);
+
+  // Send / Find Mailbox State (shared by both Guest Tab 2 and Authenticated Hub)
+  const [searchUsername, setSearchUsername] = useState("");
+  const [searchStatus, setSearchStatus] = useState<"idle" | "checking" | "found" | "not_found">("idle");
+
+  // 1. Session Detection on Client Mount
+  const scanSession = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("chithi:token:")) {
+          const u = key.replace("chithi:token:", "").trim();
+          if (u) {
+            setActiveUser(u);
+            setIsSessionLoaded(true);
+            return;
+          }
+        }
+      }
+
+      if (typeof document !== "undefined") {
+        const match = document.cookie.match(/chithi_s_([a-zA-Z0-9_-]+)=/);
+        if (match && match[1]) {
+          setActiveUser(match[1]);
+          setIsSessionLoaded(true);
+          return;
+        }
+      }
+
+      setActiveUser(null);
+      setIsSessionLoaded(true);
+    } catch {
+      setActiveUser(null);
+      setIsSessionLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    scanSession();
+    window.addEventListener("storage", scanSession);
+    return () => window.removeEventListener("storage", scanSession);
+  }, [scanSession]);
+
+  // 2. Fetch Expiry for Authenticated User
+  useEffect(() => {
+    if (!activeUser) {
+      setExpiresAt(0);
+      return;
+    }
+
+    let isMounted = true;
+    fetch(`/api/mailbox/${encodeURIComponent(activeUser.toLowerCase())}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (isMounted && json.ok && json.data?.expiresAt) {
+          setExpiresAt(json.data.expiresAt);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeUser]);
+
+  const countdown = useCountdown(expiresAt);
+
+  // 3. Username availability check debounced 400ms with automatic collision resolution for suggestions
+  useEffect(() => {
+    const trimmed = username.trim().toLowerCase();
+    if (!trimmed || trimmed.length < 3) {
+      setAvailability("idle");
+      return;
+    }
+
+    if (!USERNAME_REGEX.test(trimmed)) {
+      setAvailability("taken");
+      return;
+    }
+
+    setAvailability("checking");
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/mailbox/${encodeURIComponent(trimmed)}`);
+        const json = await res.json();
+        if (json.ok && json.data?.exists) {
+          setAvailability("taken");
+          // If collision occurs on an automatic suggestion, generate a suitable alternative
+          if (!isUsernameManuallyEdited && name.trim()) {
+            const alternative = `${trimmed.slice(0, 16)}-${Math.floor(10 + Math.random() * 90)}`;
+            setUsername(alternative);
+          }
+        } else if (res.status === 404 || !json.ok) {
+          setAvailability("available");
+        } else {
+          setAvailability("available");
+        }
+      } catch {
+        setAvailability("available");
+      }
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [username, isUsernameManuallyEdited, name]);
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setName(val);
+    if (!isUsernameManuallyEdited) {
+      const suggested = suggestUsernameFromName(val);
+      setUsername(suggested);
+    }
+  };
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsUsernameManuallyEdited(true);
+    setUsername(e.target.value);
+  };
+
+  // 4. Recipient search debounced 400ms
+  useEffect(() => {
+    const trimmed = searchUsername.trim().toLowerCase();
+    if (!trimmed || trimmed.length < 3) {
+      setSearchStatus("idle");
+      return;
+    }
+
+    setSearchStatus("checking");
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/mailbox/${encodeURIComponent(trimmed)}`);
+        const json = await res.json();
+        if (json.ok && json.data?.exists) {
+          setSearchStatus("found");
+        } else {
+          setSearchStatus("not_found");
+        }
+      } catch {
+        setSearchStatus("not_found");
+      }
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [searchUsername]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      showToast(
+        locale === "bn" ? "অনুগ্রহ করে আপনার নাম লিখুন" : "Please enter your name",
+        "warn"
+      );
+      return;
+    }
+
+    if (availability === "taken") {
+      showToast(t("home.usernameTaken"), "warn");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch("/api/mailbox/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          username: username.trim(),
+          durationKey,
+          gender,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (json.ok) {
+        setCreatedMailbox(json.data);
+      } else {
+        showToast(t(json.error?.message || "errors.generic"), "error");
+      }
+    } catch {
+      showToast(t("errors.generic"), "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const durationOptions: DurationKey[] = ["12h", "24h", "3d", "7d"];
+
+  // Whether user is authenticated and active
+  const isAuthenticated = Boolean(
+    isSessionLoaded &&
+      activeUser &&
+      (!expiresAt || !countdown.isExpired)
+  );
+
+  return (
+    <PageShell>
+      <div className="space-y-16 md:space-y-24 pb-36 sm:pb-44">
+        {/* =========================================================================
+            SCENARIO A — ACTIVE LOGGED-IN MAILBOX (Section 9)
+            Strictly hide Create Mailbox form. Render Authenticated Mailbox Hub.
+           ========================================================================= */}
+        {isAuthenticated && activeUser ? (
+          <section className="pt-4 md:pt-8 space-y-8">
+            {/* 1. Welcoming Banner Card with Washi Tape */}
+            <div className="relative p-6 sm:p-10 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] overflow-hidden transition-colors">
+              <div className="absolute -top-3 right-8 w-28 h-6 washi-tape-lavender rounded-sm pointer-events-none" />
+
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-medium bg-[#D8ECD9] dark:bg-[#163820] text-[#2E5334] dark:text-[#A7F3D0] border border-[#A7F3D0] dark:border-[#2E5334]">
+                    <span className="w-2 h-2 rounded-full bg-[#2E5334] dark:bg-[#A7F3D0] animate-pulse" />
+                    <span>{locale === "bn" ? "সক্রিয় ডাকবাক্স" : "Active Mailbox"}</span>
+                  </div>
+
+                  <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0] tracking-tight">
+                    {locale === "bn"
+                      ? `স্বাগতম, @${activeUser}`
+                      : `Welcome back, @${activeUser}`}
+                  </h1>
+                  <p className="text-sm text-[#7C7069] dark:text-[#A592A4] leading-relaxed max-w-lg">
+                    {locale === "bn"
+                      ? "আপনার গোপন ডাকবাক্স সক্রিয় আছে এবং চিঠি গ্রহণ চলছে।"
+                      : "Your secret mailbox is active and ready for letters."}
+                  </p>
+                </div>
+
+                {/* Live Countdown Pill in Warm Buttercup Pastel */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#FEF3C7]/80 dark:bg-[#2B1B38] border border-[#FDE68A] dark:border-[#52336B] flex flex-col sm:items-end justify-center shadow-sm min-w-[210px]">
+                  <div className="flex items-center gap-1.5 text-xs font-mono text-[#7C7069] dark:text-[#A592A4] uppercase tracking-wider mb-1">
+                    <Clock size={14} className="text-[#D9534F]" />
+                    <span>{locale === "bn" ? "সময় বাকি:" : "Time Left:"}</span>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0] tracking-tight">
+                    {countdown.formatted || "..."}
+                  </div>
+                </div>
+              </div>
+
+              {/* Primary Quick-Action Bar */}
+              <div className="pt-6 mt-6 border-t border-[#EBE3D5] dark:border-[#351D4D] flex flex-wrap items-center gap-3">
+                <Link href={`/inbox/${activeUser}`}>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className="rounded-full gap-2 font-medium shadow-sm"
+                  >
+                    <Inbox size={18} strokeWidth={1.5} />
+                    <span>{locale === "bn" ? "📬 ইনবক্স খুলুন" : "📬 Open Secret Inbox"}</span>
+                  </Button>
+                </Link>
+
+                <Link href="/profile">
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    className="rounded-full bg-[#FAF7F2] dark:bg-[#1E0F2E] hover:bg-[#FFFDF9] dark:hover:bg-[#2B143D] text-[#2D2522] dark:text-[#FFF8F0] border border-[#EBE3D5] dark:border-[#351D4D] gap-2 font-medium"
+                  >
+                    <User size={16} strokeWidth={1.5} className="text-[#D9534F]" />
+                    <span>{locale === "bn" ? "🌸 আমার প্রোফাইল ও লিংক" : "🌸 My Profile & Link"}</span>
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* 2. Recipient Search Box ("কাউকে চিঠি পাঠান") */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] space-y-5 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FEF3C7] dark:bg-[#2B1B38] border border-[#FDE68A] dark:border-[#52336B] flex items-center justify-center text-[#D9534F]">
+                  <Send size={18} strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+                    {locale === "bn" ? "কাউকে চিঠি পাঠান" : "Send a Letter to Someone"}
+                  </h2>
+                  <p className="text-xs text-[#7C7069] dark:text-[#A592A4] mt-0.5">
+                    {locale === "bn"
+                      ? "প্রাপকের ডাকবাক্সের নাম লিখুন এবং সরাসরি তার চিঠির পাতায় যান।"
+                      : "Enter their mailbox username to jump straight to their writing desk."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 max-w-xl">
+                <div className="relative flex items-center">
+                  <span className="absolute left-4 text-xs font-mono text-[#7C7069] select-none pointer-events-none">
+                    chithi.site/
+                  </span>
+                  <Input
+                    value={searchUsername}
+                    onChange={(e) => setSearchUsername(e.target.value.replace(/\s+/g, ""))}
+                    placeholder="username"
+                    maxLength={20}
+                    className="pl-28 rounded-full"
+                  />
+                  <div className="absolute right-4 text-[#7C7069]">
+                    {searchStatus === "checking" && (
+                      <span className="text-xs font-mono animate-pulse text-[#D9534F]">...</span>
+                    )}
+                    {searchStatus === "found" && (
+                      <CheckCircle size={16} className="text-[#2E5334]" />
+                    )}
+                    {searchStatus === "not_found" && (
+                      <XCircle size={16} className="text-[#D9534F]" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-[#7C7069] px-2">
+                  {searchStatus === "found" && (
+                    <span className="text-[#2E5334] font-medium">
+                      {locale === "bn"
+                        ? "ডাকবাক্স সক্রিয় আছে এবং চিঠি নেওয়ার জন্য প্রস্তুত!"
+                        : "Mailbox found and ready for letters!"}
+                    </span>
+                  )}
+                  {searchStatus === "not_found" && (
+                    <span className="text-[#D9534F] font-medium">
+                      {locale === "bn"
+                        ? "এই নামে কোনো সক্রিয় ডাকবাক্স পাওয়া যায়নি।"
+                        : "No active mailbox found with this name."}
+                    </span>
+                  )}
+                  {searchStatus === "idle" && (
+                    <span>
+                      {locale === "bn"
+                        ? "যাকে চিঠি পাঠাতে চান তার ইউজারনেম দিন"
+                        : "Enter the username of your recipient"}
+                    </span>
+                  )}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  disabled={searchStatus !== "found"}
+                  onClick={() => router.push(`/${searchUsername.trim().toLowerCase()}`)}
+                  className="rounded-full gap-2 text-sm"
+                >
+                  <span>
+                    {locale === "bn"
+                      ? `@${searchUsername || "..."}-কে চিঠি লিখুন`
+                      : `Write Letter to @${searchUsername || "..."}`}
+                  </span>
+                  <ArrowRight size={16} strokeWidth={1.5} />
+                </Button>
+              </div>
+            </div>
+          </section>
+        ) : (
+          /* =========================================================================
+              SCENARIO B — GUEST / LOGGED OUT (Section 10)
+              Show Hero Section + Dual-Tab Container (Create Mailbox vs Send Letter).
+             ========================================================================= */
+          <section className="pt-6 md:pt-12 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start relative">
+            {/* Left: Modern, Charming Hero Section with Paper-cut / Scrapbook elements */}
+            <div className="lg:col-span-6 space-y-6 relative">
+              <div className="flex items-center gap-3">
+                <AirmailTape label="PAR AVION" sublabel="বিমান ডাক · CHITHI" rotation={-3} />
+                <Badge variant="buttercup">
+                  {t("home.badge")}
+                </Badge>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-3">
+                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0] tracking-tight">
+                    Chithi
+                  </h1>
+                  <span className="text-2xl sm:text-3xl font-serif text-[#D9534F] font-normal">
+                    চিঠি
+                  </span>
+                  <PaperCutStamp
+                    label="CHITHI"
+                    sublabel="পোস্ট"
+                    rotation={4}
+                    className="hidden sm:inline-block ml-2"
+                  />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-serif italic text-[#7C7069] dark:text-[#A592A4] leading-snug">
+                  {locale === "bn"
+                    ? "মনের না বলা কথাগুলো নিঃশব্দে পৌঁছে যাক"
+                    : "Letters written for the heart, kept safe in time."}
+                </h2>
+              </div>
+
+              <p className="text-sm sm:text-base text-[#7C7069] dark:text-[#A592A4] leading-relaxed max-w-lg">
+                {locale === "bn"
+                  ? "অ্যাকাউন্ট ছাড়া সম্পূর্ণ বেনামে চিঠি পাওয়ার ব্যক্তিগত ঠিকানা। নির্ধারিত সময় শেষেই সব চিঠি চিরতরে মুছে যাবে।"
+                  : t("home.heroDesc")}
+              </p>
+
+              {/* Trust Indicators */}
+              <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-[#7C7069] dark:text-[#A592A4]">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#D9534F]" />
+                  {locale === "bn" ? "কোনো পাসওয়ার্ড নেই" : "Zero passwords"}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#2E5334]" />
+                  {locale === "bn" ? "কোনো ট্র্যাকিং নেই" : "No tracking"}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#D9534F]" />
+                  {locale === "bn" ? "সময় শেষেই চিরতরে বিলীন" : "Hard TTL purge"}
+                </span>
+              </div>
+
+              {/* Scrapbook Paper Note */}
+              <div className="pt-1">
+                <PaperScrap
+                  text={locale === "bn" ? "মনের কথা খামে ভরে পৌঁছে দিন..." : "Words that matter, sealed in an envelope..."}
+                  rotation={1}
+                />
+              </div>
+            </div>
+
+            {/* Right: Dual-Tab Interactive Container (Create vs Send) */}
+            <div className="lg:col-span-6">
+              {createdMailbox ? (
+                <MailboxKeyCard
+                  username={createdMailbox.username}
+                  recoveryPasscode={createdMailbox.recoveryPasscode}
+                  inboxUrl={createdMailbox.inboxUrl}
+                  publicUrl={createdMailbox.publicUrl}
+                  isInitialCreation={true}
+                  onEnterInbox={() => {
+                    window.location.href = createdMailbox.inboxUrl;
+                  }}
+                />
+              ) : (
+                <div className="border border-[#EBE3D5] dark:border-[#351D4D] rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] p-6 sm:p-8 space-y-6 shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] relative overflow-visible transition-colors">
+                  <div className="absolute -top-3 right-8 w-24 h-6 washi-tape-sage rounded-sm pointer-events-none" />
+                  <PostmarkSeal
+                    city="CHITHI · DAK GHAR"
+                    date="SPECIAL AIR"
+                    rotation={8}
+                    className="absolute -top-6 -right-5 hidden md:inline-flex pointer-events-none z-20"
+                  />
+
+                  {/* Animated Dual-Tab Switcher Header */}
+                  <div className="flex p-1 bg-[#FAF7F2] dark:bg-[#12061C] rounded-full border border-[#EBE3D5] dark:border-[#351D4D] relative">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("create")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-full text-xs sm:text-sm font-medium transition-colors relative z-10 ${
+                        activeTab === "create" ? "text-[#2D2522] dark:text-[#FFF8F0]" : "text-[#7C7069] dark:text-[#A592A4] hover:text-[#2D2522] dark:hover:text-[#FFF8F0]"
+                      }`}
+                    >
+                      <Mail size={16} strokeWidth={1.5} className={activeTab === "create" ? "text-[#D9534F]" : ""} />
+                      <span>{locale === "bn" ? "চিঠি পাওয়ার ঠিকানা" : "Create Mailbox"}</span>
+                      {activeTab === "create" && (
+                        <motion.div
+                          layoutId="activeHeroTab"
+                          className="absolute inset-0 rounded-full bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-sm -z-10"
+                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("send")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-full text-xs sm:text-sm font-medium transition-colors relative z-10 ${
+                        activeTab === "send" ? "text-[#2D2522] dark:text-[#FFF8F0]" : "text-[#7C7069] dark:text-[#A592A4] hover:text-[#2D2522] dark:hover:text-[#FFF8F0]"
+                      }`}
+                    >
+                      <Send size={16} strokeWidth={1.5} className={activeTab === "send" ? "text-[#D9534F]" : ""} />
+                      <span>{locale === "bn" ? "কাউকে চিঠি পাঠান" : "Send a Letter"}</span>
+                      {activeTab === "send" && (
+                        <motion.div
+                          layoutId="activeHeroTab"
+                          className="absolute inset-0 rounded-full bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-sm -z-10"
+                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                    </button>
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    {activeTab === "create" ? (
+                      /* Tab 1: Create a Mailbox */
+                      <motion.div
+                        key="create-tab"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="space-y-5"
+                      >
+                        <div>
+                          <h2 className="text-xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+                            {t("home.createHeading")}
+                          </h2>
+                          <p className="text-xs text-[#7C7069] dark:text-[#A592A4] mt-1">
+                            {t("home.createSubheading")}
+                          </p>
+                        </div>
+
+                        <form onSubmit={handleCreate} className="space-y-5">
+                          {/* Name Field (Required) with Live Username Auto-Suggestion */}
+                          <div className="space-y-1.5">
+                            <label className="block text-xs font-mono uppercase tracking-wider text-[#7C7069] dark:text-[#A592A4]">
+                              {locale === "bn" ? "আপনার নাম" : "Your Name"}
+                            </label>
+                            <Input
+                              value={name}
+                              onChange={handleNameChange}
+                              placeholder={locale === "bn" ? "যেমন: রহিম আহমেদ" : "e.g. Rahim Ahmed"}
+                              maxLength={50}
+                              required
+                            />
+                            <p className="text-[11px] text-[#7C7069] dark:text-[#A592A4]">
+                              {locale === "bn"
+                                ? "নাম লিখলেই নিচে একটি স্বয়ংক্রিয় ও ফাঁকা ইউজারনেম তৈরি হবে।"
+                                : "Entering your name will automatically suggest an available username below."}
+                            </p>
+                          </div>
+
+                          {/* Username Field with Live Validation & Editable Suggestion */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="block text-xs font-mono uppercase tracking-wider text-[#7C7069] dark:text-[#A592A4]">
+                                {t("home.usernameLabel")}
+                              </label>
+                              {isUsernameManuallyEdited && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsUsernameManuallyEdited(false);
+                                    if (name.trim()) {
+                                      setUsername(suggestUsernameFromName(name));
+                                    }
+                                  }}
+                                  className="text-[10px] font-mono text-[#D9534F] hover:underline cursor-pointer"
+                                >
+                                  {locale === "bn" ? "পুনরায় সাজেস্ট করুন" : "Reset to suggestion"}
+                                </button>
+                              )}
+                            </div>
+                            <div className="relative">
+                              <Input
+                                value={username}
+                                onChange={handleUsernameChange}
+                                placeholder={t("home.usernamePlaceholder")}
+                                maxLength={20}
+                                required
+                              />
+                              <div className="absolute right-4 top-3 text-[#7C7069] dark:text-[#A592A4]">
+                                {availability === "checking" && (
+                                  <span className="text-xs font-mono animate-pulse text-[#D9534F]">...</span>
+                                )}
+                                {availability === "available" && (
+                                  <CheckCircle size={16} className="text-[#2E5334]" />
+                                )}
+                                {availability === "taken" && (
+                                  <XCircle size={16} className="text-[#D9534F]" />
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] text-[#7C7069] dark:text-[#A592A4]">
+                              <span>{t("home.usernameHelp")}</span>
+                              {availability === "available" && (
+                                <span className="text-[#2E5334] font-medium">
+                                  {t("home.usernameAvailable")}
+                                </span>
+                              )}
+                              {availability === "taken" && (
+                                <span className="text-[#D9534F] font-medium">
+                                  {t("home.usernameTaken")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Lifespan Segmented Options (12h, 24h, 3d, 7d) */}
+                          <div className="space-y-2">
+                            <label className="block text-xs font-mono uppercase tracking-wider text-[#7C7069] dark:text-[#A592A4]">
+                              {t("home.durationLabel")}
+                            </label>
+                            <div className="grid grid-cols-4 gap-2">
+                              {durationOptions.map((key) => {
+                                const isSelected = durationKey === key;
+                                const durationSeconds = DURATIONS[key];
+                                const hours = durationSeconds / 3600;
+                                const label = hours >= 24 ? `${hours / 24}d` : `${hours}h`;
+
+                                return (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => setDurationKey(key)}
+                                    className={`py-2 px-1 text-center font-mono text-xs rounded-xl border transition-all select-none ${
+                                      isSelected
+                                        ? "bg-[#FAF7F2] dark:bg-[#2B143D] border-[#D9534F] text-[#2D2522] dark:text-[#FFF8F0] ring-1 ring-[#D9534F] font-bold shadow-sm"
+                                        : "bg-[#FFFDF9] dark:bg-[#170A24] border-[#EBE3D5] dark:border-[#351D4D] text-[#7C7069] dark:text-[#A592A4] hover:text-[#2D2522] dark:hover:text-[#FFF8F0] hover:border-[#D4A373] dark:hover:border-[#E88B60]"
+                                    }`}
+                                  >
+                                    {label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <p className="text-[11px] text-[#7C7069] dark:text-[#A592A4]">
+                              {t("home.durationHelper")}
+                            </p>
+                          </div>
+
+                          {/* Optional Gender for Bottle routing */}
+                          <div className="space-y-1.5">
+                            <label className="block text-xs font-mono uppercase tracking-wider text-[#7C7069] dark:text-[#A592A4]">
+                              {t("home.genderLabel")}
+                            </label>
+                            <Select
+                              value={gender}
+                              onChange={(e) => setGender(e.target.value as Gender)}
+                            >
+                              <option value="unspecified">{t("home.genderOptions.unspecified")}</option>
+                              <option value="male">{t("home.genderOptions.male")}</option>
+                              <option value="female">{t("home.genderOptions.female")}</option>
+                              <option value="other">{t("home.genderOptions.other")}</option>
+                            </Select>
+                            <p className="text-[11px] text-[#7C7069] dark:text-[#A592A4]">
+                              {t("home.genderHelper")}
+                            </p>
+                          </div>
+
+                          <Button
+                            type="submit"
+                            variant="primary"
+                            size="lg"
+                            className="w-full mt-2 rounded-full"
+                            isLoading={isSubmitting}
+                            disabled={availability === "taken"}
+                          >
+                            {t("home.submitCreate")}
+                          </Button>
+                        </form>
+
+                        {/* Centered Passcode Login Link */}
+                        <div className="pt-3 border-t border-[#EBE3D5] dark:border-[#351D4D] text-center">
+                          <Link
+                            href="/recover"
+                            className="inline-flex items-center gap-1.5 text-xs text-[#7C7069] dark:text-[#A592A4] hover:text-[#D9534F] transition-colors font-mono"
+                          >
+                            <KeyRound size={13} strokeWidth={1.5} />
+                            <span>
+                              {locale === "bn"
+                                ? "আগের তৈরি করা ইনবক্স আছে? [পাসকোড দিয়ে লগইন করুন]"
+                                : "Already have a mailbox? [Login with Passcode]"}
+                            </span>
+                          </Link>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      /* Tab 2: Send a Letter / Search Mailbox */
+                      <motion.div
+                        key="send-tab"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="space-y-6"
+                      >
+                        <div>
+                          <h2 className="text-xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+                            {locale === "bn" ? "কাউকে চিঠি পাঠান" : "Send a Letter"}
+                          </h2>
+                          <p className="text-xs text-[#7C7069] dark:text-[#A592A4] mt-1">
+                            {locale === "bn"
+                              ? "প্রাপকের ডাকবাক্সের নাম লিখুন এবং সরাসরি তার ব্যক্তিগত চিঠির পাতায় যান।"
+                              : "Enter the recipient's mailbox username to open their writing desk."}
+                          </p>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="space-y-1.5">
+                            <label className="block text-xs font-mono uppercase tracking-wider text-[#7C7069] dark:text-[#A592A4]">
+                              {locale === "bn" ? "প্রাপকের ডাকবাক্স" : "Recipient Username"}
+                            </label>
+                            <div className="relative flex items-center">
+                              <span className="absolute left-4 text-xs font-mono text-[#7C7069] dark:text-[#A592A4] select-none pointer-events-none">
+                                chithi.site/
+                              </span>
+                              <Input
+                                value={searchUsername}
+                                onChange={(e) => setSearchUsername(e.target.value.replace(/\s+/g, ""))}
+                                placeholder="username"
+                                maxLength={20}
+                                className="pl-28 rounded-full"
+                              />
+                              <div className="absolute right-4 text-[#7C7069] dark:text-[#A592A4]">
+                                {searchStatus === "checking" && (
+                                  <span className="text-xs font-mono animate-pulse text-[#D9534F]">...</span>
+                                )}
+                                {searchStatus === "found" && (
+                                  <CheckCircle size={16} className="text-[#2E5334]" />
+                                )}
+                                {searchStatus === "not_found" && (
+                                  <XCircle size={16} className="text-[#D9534F]" />
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] text-[#7C7069] dark:text-[#A592A4] px-2">
+                              {searchStatus === "found" && (
+                                <span className="text-[#2E5334] font-medium">
+                                  {locale === "bn"
+                                    ? "ডাকবাক্স সক্রিয় আছে এবং চিঠি নেওয়ার জন্য প্রস্তুত!"
+                                    : "Mailbox found and ready for letters!"}
+                                </span>
+                              )}
+                              {searchStatus === "not_found" && (
+                                <span className="text-[#D9534F] font-medium">
+                                  {locale === "bn"
+                                    ? "এই নামে কোনো সক্রিয় ডাকবাক্স পাওয়া যায়নি।"
+                                    : "No active mailbox found with this name."}
+                                </span>
+                              )}
+                              {searchStatus === "idle" && (
+                                <span>
+                                  {locale === "bn"
+                                    ? "যাকে চিঠি পাঠাতে চান তার ইউজারনেম দিন"
+                                    : "Enter the username of your recipient"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="lg"
+                            disabled={searchStatus !== "found"}
+                            onClick={() => router.push(`/${searchUsername.trim().toLowerCase()}`)}
+                            className="w-full rounded-full gap-2 text-sm"
+                          >
+                            <span>
+                              {locale === "bn"
+                                ? `@${searchUsername || "..."}-কে চিঠি লিখুন`
+                                : `Write Letter to @${searchUsername || "..."}`}
+                            </span>
+                            <ArrowRight size={16} strokeWidth={1.5} />
+                          </Button>
+                        </div>
+
+                        {/* Alternate Exploration Tips */}
+                        <div className="p-4 rounded-2xl bg-[#FAF7F2] dark:bg-[#1E0F2E] border border-[#EBE3D5] dark:border-[#351D4D] space-y-2 text-xs text-[#7C7069] dark:text-[#A592A4]">
+                          <div className="flex items-center gap-1.5 text-[#D9534F] font-medium">
+                            <Sparkles size={14} strokeWidth={1.5} />
+                            <span>{locale === "bn" ? "নির্দিষ্ট কোনো প্রাপক নেই?" : "No specific recipient?"}</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed">
+                            {locale === "bn"
+                              ? "চিঠির বোতল ব্যবহার করে অচেনা কারও ঠিকানায় সাগরে চিঠি ভাসিয়ে দিতে পারেন।"
+                              : "You can cast a drift bottle into the ocean to reach an anonymous stranger."}
+                          </p>
+                          <Link href="/bottle" className="text-[11px] text-[#D9534F] font-medium underline underline-offset-2 block pt-1">
+                            {locale === "bn" ? "চিঠির বোতল ভাসান →" : "Drift a Bottle →"}
+                          </Link>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Discovery Postcards Strip (Benami Kham & Drift Bottle) */}
+        <section className="space-y-6 pt-4">
+          <div className="text-center space-y-1">
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+              {locale === "bn" ? "চিঠির জগৎ ঘুরে দেখুন" : "Explore the Universe of Letters"}
+            </h2>
+            <p className="text-xs sm:text-sm text-[#7C7069] dark:text-[#A592A4]">
+              {locale === "bn"
+                ? "জনপ্রিয় বেনামী চিঠি পড়ুন কিংবা সাগরে মনের ভাবনা ভাসিয়ে দিন"
+                : "Discover letters on the public community wall or cast words into the ocean"}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {/* Benami Kham Discovery Card */}
+            <Link href="/feed" className="group block">
+              <motion.div
+                whileHover={{ y: -4, scale: 1.01 }}
+                className="h-full p-6 sm:p-8 rounded-3xl border border-[#EBE3D5] dark:border-[#351D4D] bg-[#FFFDF9] dark:bg-[#170A24] hover:border-[#D4A373] dark:hover:border-[#E88B60] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] transition-all relative overflow-hidden"
+              >
+                <div className="absolute -top-3 left-8 w-24 h-5 washi-tape-buttercup rounded-sm pointer-events-none" />
+
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] flex items-center justify-center text-[#D9534F] group-hover:scale-110 transition-transform">
+                    <Scroll size={24} strokeWidth={1.5} />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-[11px] font-mono tracking-wider bg-[#FEF3C7] text-[#6D4E12] border border-[#FDE68A] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D9534F] animate-pulse" />
+                    {locale === "bn" ? "পাবলিক ওয়াল" : "Community Feed"}
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0] group-hover:text-[#D9534F] transition-colors mb-2">
+                  {locale === "bn" ? "বেনামী খাম পড়ুন" : "Read Benami Kham"}
+                </h3>
+
+                <p className="text-xs sm:text-sm text-[#7C7069] dark:text-[#A592A4] leading-relaxed mb-6">
+                  {locale === "bn"
+                    ? "প্রাপকদের ভালোলাগায় প্রকাশিত শত শত না বলা চিঠি, স্বীকারোক্তি ও গোপন অনুভূতি।"
+                    : "Read hundreds of anonymous confessions, quiet memories, and published letters floating on the community wall."}
+                </p>
+
+                <div className="flex items-center gap-2 text-xs font-serif text-[#D9534F] group-hover:translate-x-1 transition-transform">
+                  <span>{locale === "bn" ? "দেওয়ালে যান" : "Explore Public Wall"}</span>
+                  <ArrowRight size={14} strokeWidth={1.5} />
+                </div>
+              </motion.div>
+            </Link>
+
+            {/* Bottle Drop Discovery Card */}
+            <Link href="/bottle" className="group block">
+              <motion.div
+                whileHover={{ y: -4, scale: 1.01 }}
+                className="h-full p-6 sm:p-8 rounded-3xl border border-[#EBE3D5] dark:border-[#351D4D] bg-[#FFFDF9] dark:bg-[#170A24] hover:border-[#BAE6FD] dark:hover:border-[#0284C7] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] transition-all relative overflow-hidden"
+              >
+                <div className="absolute -top-3 left-8 w-24 h-5 washi-tape-skymist rounded-sm pointer-events-none" />
+
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#E0F2FE] dark:bg-[#0B2538] border border-[#BAE6FD] dark:border-[#1E4868] flex items-center justify-center text-[#0284C7] group-hover:scale-110 transition-transform">
+                    <Waves size={24} strokeWidth={1.5} />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-[11px] font-mono tracking-wider bg-[#E0F2FE] dark:bg-[#0B2538] text-[#1E4868] dark:text-[#BAE6FD] border border-[#BAE6FD] dark:border-[#1E4868] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0284C7] animate-pulse" />
+                    {locale === "bn" ? "সাগরে ভাসান" : "Drift Bottle"}
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0] group-hover:text-[#D9534F] transition-colors mb-2">
+                  {locale === "bn" ? "চিঠির বোতল ভাসান" : "Cast a Bottle into the Ocean"}
+                </h3>
+
+                <p className="text-xs sm:text-sm text-[#7C7069] dark:text-[#A592A4] leading-relaxed mb-6">
+                  {locale === "bn"
+                    ? "উন্মুক্ত সাগরে মনের ভাবনা ভাসিয়ে দিন, যা পৌঁছাবে সম্পূর্ণ অচেনা কোনো মানুষের তীরে।"
+                    : "Cast your heartfelt words into the open digital sea to reach a completely random stranger's inbox."}
+                </p>
+
+                <div className="flex items-center gap-2 text-xs font-serif text-[#0284C7] group-hover:translate-x-1 transition-transform">
+                  <span>{locale === "bn" ? "সাগরে ভাসান" : "Send Bottle Letter"}</span>
+                  <ArrowRight size={14} strokeWidth={1.5} />
+                </div>
+              </motion.div>
+            </Link>
+          </div>
+        </section>
+
+        {/* How it works in warm prose */}
+        <section className="space-y-10 max-w-4xl mx-auto pt-6 border-t border-[#EBE3D5] dark:border-[#351D4D]">
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+              {t("home.howItWorksHeading")}
+            </h3>
+          </div>
+
+          <div className="space-y-8 divide-y divide-[#EBE3D5] dark:divide-[#351D4D]">
+            <div className="pt-6 space-y-2">
+              <h4 className="text-base font-serif font-semibold text-[#D9534F]">
+                {t("home.step1Title")}
+              </h4>
+              <p className="text-sm text-[#7C7069] dark:text-[#A592A4] leading-relaxed">
+                {t("home.step1Desc")}
+              </p>
+            </div>
+
+            <div className="pt-6 space-y-2">
+              <h4 className="text-base font-serif font-semibold text-[#D9534F]">
+                {t("home.step2Title")}
+              </h4>
+              <p className="text-sm text-[#7C7069] dark:text-[#A592A4] leading-relaxed">
+                {t("home.step2Desc")}
+              </p>
+            </div>
+
+            <div className="pt-6 space-y-2">
+              <h4 className="text-base font-serif font-semibold text-[#D9534F]">
+                {t("home.step3Title")}
+              </h4>
+              <p className="text-sm text-[#7C7069] dark:text-[#A592A4] leading-relaxed">
+                {t("home.step3Desc")}
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </PageShell>
+  );
+}

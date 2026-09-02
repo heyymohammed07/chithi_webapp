@@ -1,0 +1,58 @@
+import React from "react";
+
+export interface ToggleProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+  id?: string;
+}
+
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+  id,
+}: ToggleProps) {
+  const toggleId = id || `toggle_${Math.random().toString(36).slice(2, 7)}`;
+
+  return (
+    <label
+      htmlFor={toggleId}
+      className={`inline-flex items-center gap-3 cursor-pointer select-none ${
+        disabled ? "opacity-40 cursor-not-allowed" : ""
+      }`}
+    >
+      <div className="relative">
+        <input
+          id={toggleId}
+          type="checkbox"
+          role="switch"
+          aria-checked={checked}
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+          className="sr-only"
+        />
+        <div
+          className={`w-11 h-6 rounded-full transition-colors duration-200 border ${
+            checked
+              ? "bg-[#D9534F] border-[#D9534F]"
+              : "bg-[#EBE3D5] border-[#EBE3D5]"
+          }`}
+        />
+        <div
+          className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+            checked ? "transform translate-x-5" : ""
+          }`}
+        />
+      </div>
+      {label && (
+        <span className="text-xs sm:text-sm font-medium text-[#2D2522] dark:text-stone-200 select-none">
+          {label}
+        </span>
+      )}
+    </label>
+  );
+}
