@@ -17,20 +17,23 @@ export default async function LetterSentPage(props: {
           <WaxSeal size={64} isCracked={false} />
         </div>
 
-        <h1 className="text-3xl font-serif font-bold text-ivory">
+        <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-900 dark:text-stone-100 tracking-tight text-center">
           Your letter is on its way
-        </h1>
+        </h2>
 
-        <p className="text-sm text-ash leading-relaxed">
+        <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed max-w-sm mx-auto">
           Your words have been sealed and delivered to{" "}
-          <span className="text-gold font-medium">@{username}</span>&apos;s mailbox.
+          <span className="text-[#D9534F] dark:text-[#E88B60] font-semibold">@{username}</span>&apos;s mailbox.
           Because this is anonymous, the letter cannot be edited, recalled, or
           tracked.
         </p>
 
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link href={`/${username}`} className="w-full sm:w-auto">
-            <Button variant="outline" className="w-full">
+            <Button
+              variant="outline"
+              className="w-full text-stone-800 dark:text-stone-200 border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800"
+            >
               Write another letter
             </Button>
           </Link>

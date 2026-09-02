@@ -22,13 +22,16 @@ export function Modal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (isOpen) {
       previousActiveElement.current = document.activeElement as HTMLElement;
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === "Escape") {
-          onClose();
+          onCloseRef.current();
         }
       };
       document.addEventListener("keydown", handleKeyDown);
@@ -40,7 +43,7 @@ export function Modal({
         previousActiveElement.current?.focus();
       };
     }
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

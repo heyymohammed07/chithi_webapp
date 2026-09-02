@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PaperPicker } from "./PaperPicker";
@@ -64,6 +64,9 @@ export function LetterComposer({
   const [bottleTarget, setBottleTarget] = useState<"anyone" | "male" | "female">("anyone");
   const [attachedSong, setAttachedSong] = useState<AttachedSong | null>(null);
   const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
+  const handleCloseMusicModal = useCallback(() => {
+    setIsMusicModalOpen(false);
+  }, []);
 
   const [advancedState, setAdvancedState] = useState<AdvancedModeState>({
     lockKind: "none",
@@ -650,7 +653,7 @@ export function LetterComposer({
       {/* Song Attachment Search Modal */}
       <SongAttachmentModal
         isOpen={isMusicModalOpen}
-        onClose={() => setIsMusicModalOpen(false)}
+        onClose={handleCloseMusicModal}
         onSelectSong={setAttachedSong}
         currentSong={attachedSong}
       />

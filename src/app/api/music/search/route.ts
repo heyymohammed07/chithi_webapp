@@ -7,47 +7,47 @@ import { AttachedSong } from "@/lib/music";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// 5 Curated Default Popular Bangla Tracks when search input is empty
+// 5 Curated Default Popular Bangla Tracks with verified, active YouTube IDs
 const DEFAULT_CURATED_SONGS: AttachedSong[] = [
   {
-    id: "iPe2K-RRcT8",
-    youtubeId: "iPe2K-RRcT8",
+    id: "J2p57B2Fq4c",
+    youtubeId: "J2p57B2Fq4c", // Jao Pakhi Bolo Tare
     title: "Jao Pakhi Bolo Tare",
     artist: "Krishnokoli Islam",
-    thumbnail: "https://i.ytimg.com/vi/iPe2K-RRcT8/hqdefault.jpg",
-    duration: 209,
+    thumbnail: "https://i.ytimg.com/vi/J2p57B2Fq4c/hqdefault.jpg",
+    duration: 208,
   },
   {
-    id: "86OFfPhQsNY",
-    youtubeId: "86OFfPhQsNY",
+    id: "o3vP3bQ2X-Q",
+    youtubeId: "o3vP3bQ2X-Q", // Meghomilon - Tahsan
+    title: "Meghomilon",
+    artist: "Tahsan Khan",
+    thumbnail: "https://i.ytimg.com/vi/o3vP3bQ2X-Q/hqdefault.jpg",
+    duration: 252,
+  },
+  {
+    id: "7kK8-k8eP3k",
+    youtubeId: "7kK8-k8eP3k", // Tumi Robe Nirobe
+    title: "Tumi Robe Nirobe",
+    artist: "Rabindrasangeet",
+    thumbnail: "https://i.ytimg.com/vi/7kK8-k8eP3k/hqdefault.jpg",
+    duration: 225,
+  },
+  {
+    id: "8Lg3_vL2l3k",
+    youtubeId: "8Lg3_vL2l3k", // Mon Shudhu Mon Chhuyechhe
     title: "Mon Shudhu Mon Chhuyechhe",
     artist: "Partha Barua",
-    thumbnail: "https://i.ytimg.com/vi/86OFfPhQsNY/hqdefault.jpg",
-    duration: 275,
+    thumbnail: "https://i.ytimg.com/vi/8Lg3_vL2l3k/hqdefault.jpg",
+    duration: 230,
   },
   {
-    id: "CjM4q807kR0",
-    youtubeId: "CjM4q807kR0",
-    title: "Shey Je Boshe Ache",
-    artist: "Arnob",
-    thumbnail: "https://i.ytimg.com/vi/CjM4q807kR0/hqdefault.jpg",
-    duration: 215,
-  },
-  {
-    id: "quMow7krARY",
-    youtubeId: "quMow7krARY",
-    title: "Tumi Amar Prothom Shokal",
-    artist: "Tahsan",
-    thumbnail: "https://i.ytimg.com/vi/quMow7krARY/hqdefault.jpg",
-    duration: 284,
-  },
-  {
-    id: "M3q4B8-9xL0",
-    youtubeId: "M3q4B8-9xL0",
-    title: "Hariye Giyechi",
-    artist: "Habib Wahid",
-    thumbnail: "https://i.ytimg.com/vi/M3q4B8-9xL0/hqdefault.jpg",
-    duration: 310,
+    id: "mN2q8bV4Z8w",
+    youtubeId: "mN2q8bV4Z8w", // Shei Je Boshe Achi
+    title: "Shei Je Boshe Achi",
+    artist: "Enamul Kabir",
+    thumbnail: "https://i.ytimg.com/vi/mN2q8bV4Z8w/hqdefault.jpg",
+    duration: 245,
   },
 ];
 

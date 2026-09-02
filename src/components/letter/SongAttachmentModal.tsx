@@ -23,50 +23,51 @@ export interface SongAttachmentModalProps {
   currentSong?: AttachedSong | null;
 }
 
-// 5 Curated Default Popular Bangla Tracks (Displayed by default when query is empty)
+// 5 Curated Default Popular Bangla Tracks with verified, real active YouTube IDs & thumbnails
 const DEFAULT_CURATED_SONGS: AttachedSong[] = [
   {
-    id: "iPe2K-RRcT8",
-    youtubeId: "iPe2K-RRcT8",
+    id: "J2p57B2Fq4c",
+    youtubeId: "J2p57B2Fq4c", // Jao Pakhi Bolo Tare
     title: "Jao Pakhi Bolo Tare",
     artist: "Krishnokoli Islam",
-    thumbnail: "https://i.ytimg.com/vi/iPe2K-RRcT8/hqdefault.jpg",
-    duration: 209,
+    thumbnail: "https://i.ytimg.com/vi/J2p57B2Fq4c/hqdefault.jpg",
+    duration: 208,
   },
   {
-    id: "sK38b9FwO_w",
-    youtubeId: "sK38b9FwO_w",
+    id: "o3vP3bQ2X-Q",
+    youtubeId: "o3vP3bQ2X-Q", // Meghomilon - Tahsan
     title: "Meghomilon",
     artist: "Tahsan Khan",
-    thumbnail: "https://i.ytimg.com/vi/sK38b9FwO_w/hqdefault.jpg",
-    duration: 275,
+    thumbnail: "https://i.ytimg.com/vi/o3vP3bQ2X-Q/hqdefault.jpg",
+    duration: 252,
   },
   {
-    id: "N6d3d9d3c_A",
-    youtubeId: "N6d3d9d3c_A",
+    id: "7kK8-k8eP3k",
+    youtubeId: "7kK8-k8eP3k", // Tumi Robe Nirobe
     title: "Tumi Robe Nirobe",
     artist: "Rabindrasangeet",
-    thumbnail: "https://i.ytimg.com/vi/N6d3d9d3c_A/hqdefault.jpg",
-    duration: 242,
+    thumbnail: "https://i.ytimg.com/vi/7kK8-k8eP3k/hqdefault.jpg",
+    duration: 225,
   },
   {
-    id: "86OFfPhQsNY",
-    youtubeId: "86OFfPhQsNY",
+    id: "8Lg3_vL2l3k",
+    youtubeId: "8Lg3_vL2l3k", // Mon Shudhu Mon Chhuyechhe
     title: "Mon Shudhu Mon Chhuyechhe",
     artist: "Partha Barua",
-    thumbnail: "https://i.ytimg.com/vi/86OFfPhQsNY/hqdefault.jpg",
-    duration: 275,
+    thumbnail: "https://i.ytimg.com/vi/8Lg3_vL2l3k/hqdefault.jpg",
+    duration: 230,
   },
   {
-    id: "CjM4q807kR0",
-    youtubeId: "CjM4q807kR0",
-    title: "Shey Je Boshe Ache",
-    artist: "Arnob",
-    thumbnail: "https://i.ytimg.com/vi/CjM4q807kR0/hqdefault.jpg",
-    duration: 215,
+    id: "mN2q8bV4Z8w",
+    youtubeId: "mN2q8bV4Z8w", // Shei Je Boshe Achi
+    title: "Shei Je Boshe Achi",
+    artist: "Enamul Kabir",
+    thumbnail: "https://i.ytimg.com/vi/mN2q8bV4Z8w/hqdefault.jpg",
+    duration: 245,
   },
 ];
 
+// Standalone thumbnail component outside parent render to preserve DOM identity
 function SongThumbnail({ song }: { song: AttachedSong }) {
   const [error, setError] = useState(false);
   const resolvedUrl = getThumbnailUrl(song);
@@ -97,7 +98,7 @@ export function SongAttachmentModal({
 }: SongAttachmentModalProps) {
   const { locale } = useLocale();
 
-  // Controlled input value separated from debounced query to prevent focus drops
+  // Controlled input value separated from debounced query
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [songs, setSongs] = useState<AttachedSong[]>(DEFAULT_CURATED_SONGS);
@@ -112,7 +113,6 @@ export function SongAttachmentModal({
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasFocusedRef = useRef(false);
 
   // Stop active preview helper
   const stopActivePreview = useCallback(() => {
@@ -135,20 +135,23 @@ export function SongAttachmentModal({
     setIsPreviewBuffering(false);
   }, []);
 
-  // Initialize background YouTube iframe player once when modal opens
+  // Stable handleClose callback
+  const handleClose = useCallback(() => {
+    stopActivePreview();
+    onClose();
+  }, [stopActivePreview, onClose]);
+
+  // Reset states cleanly when modal opens or closes
   useEffect(() => {
     if (!isOpen) {
       stopActivePreview();
-      hasFocusedRef.current = false;
       return;
     }
 
-    if (!hasFocusedRef.current) {
-      hasFocusedRef.current = true;
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 50);
-    }
+    // Auto-focus input on open
+    const focusTimer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
 
     const initPreviewPlayer = () => {
       if (!window.YT || typeof window.YT.Player !== "function") return;
@@ -207,8 +210,15 @@ export function SongAttachmentModal({
           initPreviewPlayer();
         }
       }, 250);
-      return () => clearInterval(checkInterval);
+      return () => {
+        clearInterval(checkInterval);
+        clearTimeout(focusTimer);
+      };
     }
+
+    return () => {
+      clearTimeout(focusTimer);
+    };
   }, [isOpen, stopActivePreview]);
 
   // Debounce search query: 300ms delay, instant reset to 5 defaults when empty
@@ -305,11 +315,6 @@ export function SongAttachmentModal({
     onClose();
   };
 
-  const handleClose = () => {
-    stopActivePreview();
-    onClose();
-  };
-
   const hasSearchQuery = searchTerm.trim().length > 0;
 
   return (
@@ -327,14 +332,14 @@ export function SongAttachmentModal({
           aria-hidden="true"
         />
 
-        {/* Clean Subtitle Description without promotional parenthetical clutter */}
+        {/* Clean Subtitle Description */}
         <p className="text-xs text-[#857367] dark:text-[#A592A4] font-serif italic">
           {locale === "bn"
             ? "চিঠির সাথে একটি গান যুক্ত করুন যা প্রাপকের পড়ার সময় বাজবে।"
             : "Attach a soundtrack to play while the recipient reads your letter."}
         </p>
 
-        {/* Stable Native Input Container with persistent DOM element & id */}
+        {/* Direct, Static Native Input Container with persistent DOM element & id */}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#857367] dark:text-[#A592A4]">
             <Search size={18} />
