@@ -50,6 +50,18 @@ export default function InboxPage(props: {
   const [isUnauthorized, setIsUnauthorized] = useState(false);
   const [isFaded, setIsFaded] = useState(false);
 
+  // Active filter: 'all' | 'unread'
+  const filterParam = searchParams.get("filter");
+  const [activeFilter, setActiveFilter] = useState<"all" | "unread">(
+    filterParam === "unread" ? "unread" : "all"
+  );
+
+  useEffect(() => {
+    if (filterParam === "unread" || filterParam === "all") {
+      setActiveFilter(filterParam);
+    }
+  }, [filterParam]);
+
   // Active letter reader state
   const [activeLetter, setActiveLetter] = useState<LetterRecord | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
@@ -392,13 +404,18 @@ export default function InboxPage(props: {
           </p>
         </div>
 
-        {/* Toolbar */}
+        {/* Toolbar with Active Filter Tabs */}
         <InboxToolbar
           username={username}
           unreadCount={unreadCount}
           totalCount={letters.length}
           acceptsBottles={mailboxMeta?.acceptsBottles ?? true}
           onOpenKeys={() => setIsKeyCardOpen(true)}
+          activeFilter={activeFilter}
+          onFilterChange={(f) => {
+            setActiveFilter(f);
+            router.replace(`/inbox/${username}?filter=${f}`, { scroll: false });
+          }}
         />
 
         {/* Envelope List or Empty State */}
@@ -423,16 +440,50 @@ export default function InboxPage(props: {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {letters.map((ltr) => (
-              <EnvelopeCard
-                key={ltr.id}
-                letter={ltr}
-                onClick={() => handleOpenLetter(ltr.id)}
-                isOpening={openingLetterId === ltr.id}
-              />
-            ))}
-          </div>
+          (() => {
+            const displayedLetters = letters.filter((l) => {
+              if (activeFilter === "unread") return !l.isOpened;
+              return true;
+            });
+
+            if (displayedLetters.length === 0) {
+              return (
+                <div className="py-12 text-center space-y-2">
+                  <p className="text-sm font-serif italic text-[#857367] dark:text-[#A592A4]">
+                    {activeFilter === "unread"
+                      ? locale === "bn"
+                        ? "কোনো অপঠিত চিঠি নেই।"
+                        : "No unread letters at the moment."
+                      : locale === "bn"
+                      ? "কোনো চিঠি পাওয়া যায়নি।"
+                      : "No letters found."}
+                  </p>
+                  {activeFilter === "unread" && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilter("all")}
+                      className="text-xs font-mono text-[#E88B60] hover:underline cursor-pointer"
+                    >
+                      {locale === "bn" ? "সকল চিঠি দেখুন" : "View all letters"}
+                    </button>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {displayedLetters.map((ltr) => (
+                  <EnvelopeCard
+                    key={ltr.id}
+                    letter={ltr}
+                    onClick={() => handleOpenLetter(ltr.id)}
+                    isOpening={openingLetterId === ltr.id}
+                  />
+                ))}
+              </div>
+            );
+          })()
         )}
       </div>
 

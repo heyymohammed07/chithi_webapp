@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useLocale } from "@/hooks/useLocale";
 import { AttachedSong } from "@/lib/music";
@@ -53,7 +52,10 @@ export function SongAttachmentModal({
   currentSong,
 }: SongAttachmentModalProps) {
   const { locale } = useLocale();
-  const [query, setQuery] = useState("");
+
+  // Controlled input value separated from debounced query to prevent focus drops
+  const [inputValue, setInputValue] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [songs, setSongs] = useState<AttachedSong[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -65,6 +67,7 @@ export function SongAttachmentModal({
   const previewPlayerRef = useRef<any>(null);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Stop active preview helper
   const stopActivePreview = useCallback(() => {
@@ -93,6 +96,11 @@ export function SongAttachmentModal({
       stopActivePreview();
       return;
     }
+
+    // Auto-focus input smoothly when modal opens
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
 
     const initPreviewPlayer = () => {
       if (!window.YT || typeof window.YT.Player !== "function") return;
@@ -155,40 +163,49 @@ export function SongAttachmentModal({
     }
   }, [isOpen, stopActivePreview]);
 
-  // Real-Time Keystroke Search with 300ms debounce
+  // Debounce keystrokes into debouncedQuery without re-rendering input container
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(inputValue.trim());
+    }, inputValue.trim() ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [inputValue]);
+
+  // Fetch search results on debouncedQuery changes
   useEffect(() => {
     if (!isOpen) return;
 
+    let isMounted = true;
     setLoading(true);
-    const timeout = setTimeout(async () => {
-      try {
-        const trimmed = query.trim();
-        const res = await fetch(`/api/music/search?q=${encodeURIComponent(trimmed)}`);
-        const json = await res.json();
-        if (json.ok && json.data?.songs) {
+
+    fetch(`/api/music/search?q=${encodeURIComponent(debouncedQuery)}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (isMounted && json.ok && json.data?.songs) {
           setSongs(json.data.songs);
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         console.error("[SongAttachmentModal search error]", err);
-      } finally {
-        setLoading(false);
-      }
-    }, query.trim() ? 300 : 0);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
 
-    return () => clearTimeout(timeout);
-  }, [query, isOpen]);
+    return () => {
+      isMounted = false;
+    };
+  }, [debouncedQuery, isOpen]);
 
   // Toggle 20s Audio Preview
   const handleTogglePreview = (e: React.MouseEvent, song: AttachedSong) => {
     e.stopPropagation();
 
-    // If already playing this song, stop it
     if (previewingSongId === song.youtubeId) {
       stopActivePreview();
       return;
     }
 
-    // Stop any existing preview first
     stopActivePreview();
 
     setPreviewingSongId(song.youtubeId);
@@ -201,7 +218,7 @@ export function SongAttachmentModal({
         previewPlayerRef.current.setVolume?.(80);
         previewPlayerRef.current.loadVideoById({
           videoId: song.youtubeId,
-          startSeconds: 10, // Start 10s in to skip silent intro
+          startSeconds: 10,
         });
         previewPlayerRef.current.playVideo?.();
       } catch (err) {
@@ -209,7 +226,6 @@ export function SongAttachmentModal({
       }
     }
 
-    // 1-second interval for countdown badge
     countdownIntervalRef.current = setInterval(() => {
       setPreviewSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -220,7 +236,6 @@ export function SongAttachmentModal({
       });
     }, 1000);
 
-    // Auto-stop after exactly 20 seconds
     previewTimerRef.current = setTimeout(() => {
       stopActivePreview();
     }, 20000);
@@ -252,27 +267,29 @@ export function SongAttachmentModal({
           aria-hidden="true"
         />
 
-        {/* Subtitle Description */}
+        {/* Clean Subtitle Description without promotional parenthetical clutter */}
         <p className="text-xs text-[#857367] dark:text-[#A592A4] font-serif italic">
           {locale === "bn"
-            ? "চিঠির সাথে একটি গান যুক্ত করুন যা প্রাপকের পড়ার সময় বাজবে (২০ সেকেন্ড প্রিভিউ শুনে নিন)।"
-            : "Attach a soundtrack to play while the recipient reads your letter (listen to a 20s preview)."}
+            ? "চিঠির সাথে একটি গান যুক্ত করুন যা প্রাপকের পড়ার সময় বাজবে।"
+            : "Attach a soundtrack to play while the recipient reads your letter."}
         </p>
 
-        {/* Real-Time Keystroke Search Input */}
+        {/* Stable Native Input Container to prevent focus drops on keystroke */}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#857367] dark:text-[#A592A4]">
             <Search size={18} />
           </div>
-          <Input
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
             placeholder={
               locale === "bn"
-                ? "গানের নাম বা শিল্পীর নাম লিখুন (যেমন: মেঘদল, অর্ণব, হাবিব)..."
-                : "Type song or artist name (real-time search)..."
+                ? "গানের নাম বা শিল্পীর নাম লিখুন..."
+                : "Search song or artist..."
             }
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="w-full pl-10 rounded-2xl bg-[#FFF8F0] dark:bg-[#1E0F2E] border-[#F0E2D2] dark:border-[#351D4D]"
+            className="w-full pl-10 pr-4 py-2.5 text-sm rounded-2xl bg-[#FFF8F0] dark:bg-[#1E0F2E] border border-[#F0E2D2] dark:border-[#351D4D] text-[#382A22] dark:text-[#FFF8F0] placeholder:text-[#857367]/60 dark:placeholder:text-[#A592A4]/60 focus:outline-none focus:ring-1 focus:ring-[#E88B60] focus:border-[#E88B60] transition-colors"
           />
         </div>
 
@@ -371,7 +388,7 @@ export function SongAttachmentModal({
         <div className="flex items-center justify-between pt-3 border-t border-[#F0E2D2] dark:border-[#351D4D]">
           <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#857367] dark:text-[#A592A4]">
             <Sparkles size={12} className="text-[#E88B60]" />
-            <span>{locale === "bn" ? "রিয়েল-টাইম সার্চ ও ২০ সে. প্রিভিউ" : "Real-time search & 20s preview"}</span>
+            <span>{locale === "bn" ? "✨ চিঠির গান" : "✨ Letter Soundtrack"}</span>
           </div>
           <Button variant="ghost" size="sm" onClick={handleClose}>
             {locale === "bn" ? "বাতিল" : "Cancel"}

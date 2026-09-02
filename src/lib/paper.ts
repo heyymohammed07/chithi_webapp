@@ -6,65 +6,74 @@ export interface FontDefinition {
   nameBn: string;
   fontVar: string;
   sample: string;
+  sampleEn: string;
 }
 
 export const FONTS: Record<FontId, FontDefinition> = {
   handwriting1: {
     id: "handwriting1",
-    name: "Cursive Calligraphy",
-    nameBn: "হাতের লেখা ১ (চারুলিপি)",
+    name: "Cursive",
+    nameBn: "চারুলিপি",
     fontVar: "var(--font-bn-hand-1), var(--font-calligraphy), cursive",
-    sample: "আমার গোপন চিঠি",
+    sample: "আমার চিঠি",
+    sampleEn: "Dear Secret",
   },
   handwriting2: {
     id: "handwriting2",
-    name: "Diary Nostalgia",
-    nameBn: "হাতের লেখা ২ (স্মৃতিকথা)",
+    name: "Diary Note",
+    nameBn: "স্মৃতিকথা",
     fontVar: "var(--font-bn-hand-2), var(--font-hand), cursive",
-    sample: "মনের না বলা কথা",
+    sample: "মনের কথা",
+    sampleEn: "Heartfelt",
   },
   handwriting3: {
     id: "handwriting3",
-    name: "Everyday Scribble",
-    nameBn: "হাতের লেখা ৩ (কথকতা)",
+    name: "Scribble",
+    nameBn: "কথকতা",
     fontVar: "var(--font-bn-hand-3), var(--font-pencil), cursive",
-    sample: "ভালোবাসার এক টুকরো চিঠি",
+    sample: "ভালোবাসা",
+    sampleEn: "Untold Tale",
   },
   typewriter: {
     id: "typewriter",
-    name: "Mechanical Typewriter",
-    nameBn: "টাইপরাইটার (নস্টালজিয়া)",
+    name: "Typewriter",
+    nameBn: "টাইপরাইটার",
     fontVar: "var(--font-mono-paper), monospace",
     sample: "চিঠি ০৭/২৪",
+    sampleEn: "Letter 07",
   },
   serif: {
     id: "serif",
-    name: "Classic Print Serif",
-    nameBn: "মুদ্রণ লিপি (চিরায়ত)",
+    name: "Classic Serif",
+    nameBn: "চিরায়ত",
     fontVar: "var(--font-bn-paper), var(--font-display), serif",
-    sample: "চিরন্তন চিঠি",
+    sample: "চিরন্তন",
+    sampleEn: "Evergreen",
   },
   // Backward compatibility aliases
   calligraphy: {
     id: "calligraphy",
-    name: "Cursive Calligraphy",
-    nameBn: "হাতের লেখা ১ (চারুলিপি)",
+    name: "Cursive",
+    nameBn: "চারুলিপি",
     fontVar: "var(--font-bn-hand-1), var(--font-calligraphy), cursive",
-    sample: "আমার গোপন চিঠি",
+    sample: "আমার চিঠি",
+    sampleEn: "Dear Secret",
   },
   casual: {
     id: "casual",
-    name: "Diary Nostalgia",
-    nameBn: "হাতের লেখা ২ (স্মৃতিকথা)",
+    name: "Diary Note",
+    nameBn: "স্মৃতিকথা",
     fontVar: "var(--font-bn-hand-2), var(--font-hand), cursive",
-    sample: "মনের না বলা কথা",
+    sample: "মনের কথা",
+    sampleEn: "Heartfelt",
   },
   pencil: {
     id: "pencil",
-    name: "Everyday Scribble",
-    nameBn: "হাতের লেখা ৩ (কথকতা)",
+    name: "Scribble",
+    nameBn: "কথকতা",
     fontVar: "var(--font-bn-hand-3), var(--font-pencil), cursive",
-    sample: "ভালোবাসার এক টুকরো চিঠি",
+    sample: "ভালোবাসা",
+    sampleEn: "Untold Tale",
   },
 };
 
@@ -134,34 +143,33 @@ export interface StampDefinition {
 }
 
 export const STAMPS: Record<StampId, StampDefinition> = {
-  wax: {
-    id: "wax",
-    labelKey: "stamps.wax",
-  },
-  topSecret: {
-    id: "topSecret",
-    labelKey: "stamps.topSecret",
-  },
-  memory: {
-    id: "memory",
-    labelKey: "stamps.memory",
-  },
-  heartbreak: {
-    id: "heartbreak",
-    labelKey: "stamps.heartbreak",
-  },
+  wax: { id: "wax", labelKey: "stamps.wax" },
+  topSecret: { id: "topSecret", labelKey: "stamps.topSecret" },
+  memory: { id: "memory", labelKey: "stamps.memory" },
+  heartbreak: { id: "heartbreak", labelKey: "stamps.heartbreak" },
 };
 
-/**
- * Deterministic pseudo-random rotation angle (-3.5deg to +3.5deg) based on letter ID or string.
- * Prevents jitter on component re-renders.
- */
+export const AVAILABLE_STAMPS: StampId[] = [
+  "wax",
+  "topSecret",
+  "memory",
+  "heartbreak",
+];
+
+export const AVAILABLE_PAPERS: PaperStyleId[] = [
+  "parchment",
+  "midnight",
+  "rose",
+  "typewriter",
+  "rainy",
+];
+
 export function getDeterministicRotation(seed: string): number {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (hash << 5) - hash + seed.charCodeAt(i);
     hash |= 0;
   }
-  const normalized = (Math.abs(hash) % 70) / 10 - 3.5;
-  return Number(normalized.toFixed(1));
+  const normalized = Math.abs(hash) % 1000;
+  return (normalized / 1000) * 1.6 - 0.8;
 }

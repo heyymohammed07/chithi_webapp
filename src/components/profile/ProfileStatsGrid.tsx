@@ -11,7 +11,6 @@ export interface ProfileStatsGridProps {
   unreadCount: number;
   totalEnvelopeCount: number;
   acceptsBottles: boolean;
-  activeFilter?: "unread" | "all" | null;
   onFilterChange?: (filter: "unread" | "all") => void;
 }
 
@@ -20,7 +19,6 @@ export function ProfileStatsGrid({
   unreadCount,
   totalEnvelopeCount,
   acceptsBottles,
-  activeFilter = null,
   onFilterChange,
 }: ProfileStatsGridProps) {
   const { locale, t } = useLocale();
@@ -32,7 +30,7 @@ export function ProfileStatsGrid({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-      {/* Stat 1: Unread Envelopes (Lavender) - Interactive Card */}
+      {/* Stat 1: Unread Envelopes (Lavender) - Directly Routes to /inbox?filter=unread */}
       <div
         role="button"
         tabIndex={0}
@@ -43,16 +41,12 @@ export function ProfileStatsGrid({
             onFilterChange?.("unread");
           }
         }}
-        className={`relative p-5 sm:p-6 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] shadow-xl flex flex-col justify-between overflow-hidden cursor-pointer hover:border-amber-400/50 hover:bg-white/[0.03] active:scale-[0.99] transition-all duration-200 select-none ${
-          activeFilter === "unread"
-            ? "border-2 border-amber-400 ring-2 ring-amber-400/40 bg-amber-500/5 dark:bg-amber-400/10"
-            : "border border-[#F0E2D2] dark:border-[#351D4D]"
-        }`}
+        className="relative p-5 sm:p-6 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl flex flex-col justify-between overflow-hidden cursor-pointer hover:border-amber-400/50 hover:bg-white/[0.03] active:scale-[0.99] transition-all duration-200 select-none group"
       >
         <div className="absolute -top-2 left-6 w-16 h-4 washi-tape-lavender rounded-sm pointer-events-none" />
 
         <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="w-11 h-11 rounded-2xl bg-[#E8DEF8] dark:bg-[#341A52] border border-[#D8B4F8] dark:border-[#52336B] flex items-center justify-center text-[#493F60] dark:text-[#E9D8FD]">
+          <div className="w-11 h-11 rounded-2xl bg-[#E8DEF8] dark:bg-[#341A52] border border-[#D8B4F8] dark:border-[#52336B] flex items-center justify-center text-[#493F60] dark:text-[#E9D8FD] group-hover:scale-105 transition-transform">
             <Mail size={20} strokeWidth={1.5} />
           </div>
           {unreadCount > 0 && (
@@ -64,7 +58,7 @@ export function ProfileStatsGrid({
           <span className="text-3xl sm:text-4xl font-serif font-bold text-[#2C1E16] dark:text-[#FFF8F0] block tracking-tight">
             {formattedUnread}
           </span>
-          <span className="text-xs sm:text-sm font-medium text-[#2C1E16] dark:text-[#FFF8F0] mt-1 block">
+          <span className="text-xs sm:text-sm font-medium text-[#2C1E16] dark:text-[#FFF8F0] mt-1 block group-hover:text-[#E88B60] transition-colors">
             {t("profile.stats.unreadTitle")}
           </span>
           <p className="text-[11px] text-[#7C7069] dark:text-[#A8988B] mt-0.5">
@@ -73,7 +67,7 @@ export function ProfileStatsGrid({
         </div>
       </div>
 
-      {/* Stat 2: Total Envelopes (Sky Mist) - Interactive Card */}
+      {/* Stat 2: Total Envelopes (Sky Mist) - Directly Routes to /inbox?filter=all */}
       <div
         role="button"
         tabIndex={0}
@@ -84,16 +78,12 @@ export function ProfileStatsGrid({
             onFilterChange?.("all");
           }
         }}
-        className={`relative p-5 sm:p-6 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] shadow-xl flex flex-col justify-between overflow-hidden cursor-pointer hover:border-amber-400/50 hover:bg-white/[0.03] active:scale-[0.99] transition-all duration-200 select-none ${
-          activeFilter === "all"
-            ? "border-2 border-amber-400 ring-2 ring-amber-400/40 bg-amber-500/5 dark:bg-amber-400/10"
-            : "border border-[#F0E2D2] dark:border-[#351D4D]"
-        }`}
+        className="relative p-5 sm:p-6 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl flex flex-col justify-between overflow-hidden cursor-pointer hover:border-amber-400/50 hover:bg-white/[0.03] active:scale-[0.99] transition-all duration-200 select-none group"
       >
         <div className="absolute -top-2 left-6 w-16 h-4 washi-tape-skymist rounded-sm pointer-events-none" />
 
         <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="w-11 h-11 rounded-2xl bg-[#E0F2FE] dark:bg-[#163852] border border-[#BAE6FD] dark:border-[#225780] flex items-center justify-center text-[#1E4868] dark:text-[#BAE6FD]">
+          <div className="w-11 h-11 rounded-2xl bg-[#E0F2FE] dark:bg-[#163852] border border-[#BAE6FD] dark:border-[#225780] flex items-center justify-center text-[#1E4868] dark:text-[#BAE6FD] group-hover:scale-105 transition-transform">
             <Inbox size={20} strokeWidth={1.5} />
           </div>
         </div>
@@ -102,7 +92,7 @@ export function ProfileStatsGrid({
           <span className="text-3xl sm:text-4xl font-serif font-bold text-[#2C1E16] dark:text-[#FFF8F0] block tracking-tight">
             {formattedTotal}
           </span>
-          <span className="text-xs sm:text-sm font-medium text-[#2C1E16] dark:text-[#FFF8F0] mt-1 block">
+          <span className="text-xs sm:text-sm font-medium text-[#2C1E16] dark:text-[#FFF8F0] mt-1 block group-hover:text-[#E88B60] transition-colors">
             {t("profile.stats.totalTitle")}
           </span>
           <p className="text-[11px] text-[#7C7069] dark:text-[#A8988B] mt-0.5">

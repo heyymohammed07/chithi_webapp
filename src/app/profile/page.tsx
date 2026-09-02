@@ -7,14 +7,11 @@ import { PageShell } from "@/components/layout/PageShell";
 import { ProfileHeaderCard } from "@/components/profile/ProfileHeaderCard";
 import { ProfileStatsGrid } from "@/components/profile/ProfileStatsGrid";
 import { PasscodeInfoModal } from "@/components/profile/PasscodeInfoModal";
-import { EnvelopeCard } from "@/components/envelope/EnvelopeCard";
-import { LetterReader } from "@/components/envelope/LetterReader";
 import { CopyField } from "@/components/ui/CopyField";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useLocale } from "@/hooks/useLocale";
 import { useAccessToken } from "@/hooks/useAccessToken";
-import { LetterRecord, LetterSummary } from "@/lib/types";
 import {
   Mail,
   KeyRound,
@@ -26,9 +23,6 @@ import {
   Inbox,
   AlertCircle,
   Bell,
-  Mailbox,
-  Filter,
-  X,
 } from "lucide-react";
 import { useLetterNotifications } from "@/hooks/useLetterNotifications";
 
@@ -47,16 +41,8 @@ export default function ProfilePage() {
 
   const [activeUsername, setActiveUsername] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [letters, setLetters] = useState<LetterSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
-
-  // Filter state: 'unread' | 'all' | null
-  const [activeFilter, setActiveFilter] = useState<"unread" | "all" | null>(null);
-
-  // Active letter reader state
-  const [activeLetter, setActiveLetter] = useState<LetterRecord | null>(null);
-  const [isReaderOpen, setIsReaderOpen] = useState(false);
 
   // Modals state
   const [isPasscodeModalOpen, setIsPasscodeModalOpen] = useState(false);
@@ -95,7 +81,7 @@ export default function ProfilePage() {
     }
   }, []);
 
-  // 2. Fetch authoritative profile data and letters from server
+  // 2. Fetch authoritative profile data from server
   const fetchProfile = useCallback(async () => {
     if (!activeUsername) {
       setLoading(false);
@@ -117,48 +103,33 @@ export default function ProfilePage() {
         headers["Authorization"] = `Bearer ${storedToken}`;
       }
 
-      const [profileRes, lettersRes] = await Promise.all([
-        fetch(
-          `/api/mailbox/profile?username=${encodeURIComponent(
-            activeUsername.toLowerCase()
-          )}`,
-          { headers }
-        ),
-        fetch(
-          `/api/letters/list?username=${encodeURIComponent(
-            activeUsername.toLowerCase()
-          )}`,
-          { headers }
-        ),
-      ]);
+      const res = await fetch(
+        `/api/mailbox/profile?username=${encodeURIComponent(
+          activeUsername.toLowerCase()
+        )}`,
+        { headers }
+      );
 
-      if (profileRes.status === 410) {
+      if (res.status === 410) {
         // Mailbox clock expired
         setErrorStatus(410);
         setLoading(false);
         return;
       }
 
-      if (profileRes.status === 401 || profileRes.status === 403) {
+      if (res.status === 401 || res.status === 403) {
         // Invalid or unauthorized token
         clearToken();
-        setErrorStatus(profileRes.status);
+        setErrorStatus(res.status);
         setLoading(false);
         return;
       }
 
-      const profileJson = await profileRes.json();
-      if (profileJson.ok && profileJson.data) {
-        setProfileData(profileJson.data);
+      const json = await res.json();
+      if (json.ok && json.data) {
+        setProfileData(json.data);
       } else {
-        setErrorStatus(profileRes.status || 500);
-      }
-
-      if (lettersRes.ok) {
-        const lettersJson = await lettersRes.json();
-        if (lettersJson.ok && lettersJson.data?.letters) {
-          setLetters(lettersJson.data.letters);
-        }
+        setErrorStatus(res.status || 500);
       }
     } catch {
       setErrorStatus(500);
@@ -173,142 +144,10 @@ export default function ProfilePage() {
     }
   }, [activeUsername, fetchProfile]);
 
-  // Handle stat card clicks (Filter toggle)
-  const handleFilterChange = (filter: "unread" | "all") => {
-    setActiveFilter((prev) => (prev === filter ? null : filter));
-  };
-
-  // Open letter reader modal
-  const handleOpenLetter = async (letterId: string) => {
-    if (!activeUsername) return;
-
-    try {
-      const storedToken =
-        token ||
-        (typeof window !== "undefined"
-          ? localStorage.getItem(`chithi:token:${activeUsername.toLowerCase()}`)
-          : null);
-
-      const res = await fetch(
-        `/api/letters/${letterId}?username=${encodeURIComponent(
-          activeUsername.toLowerCase()
-        )}`,
-        {
-          headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
-        }
-      );
-
-      const json = await res.json();
-      if (json.ok && json.data?.letter) {
-        setActiveLetter(json.data.letter);
-        setIsReaderOpen(true);
-        // Mark as opened in local state
-        setLetters((prev) =>
-          prev.map((l) => (l.id === letterId ? { ...l, isOpened: true } : l))
-        );
-        if (profileData && profileData.unreadCount > 0) {
-          setProfileData({
-            ...profileData,
-            unreadCount: Math.max(0, profileData.unreadCount - 1),
-          });
-        }
-      } else {
-        router.push(`/inbox/${activeUsername}`);
-      }
-    } catch {
-      router.push(`/inbox/${activeUsername}`);
-    }
-  };
-
-  const handleReactToLetter = async (
-    letterId: string,
-    reaction: "heart" | "heartCrack"
-  ) => {
-    if (!activeUsername) return;
-    const storedToken =
-      token ||
-      (typeof window !== "undefined"
-        ? localStorage.getItem(`chithi:token:${activeUsername.toLowerCase()}`)
-        : null);
-
-    await fetch(
-      `/api/letters/${letterId}/react?username=${encodeURIComponent(
-        activeUsername.toLowerCase()
-      )}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
-        },
-        body: JSON.stringify({ reaction }),
-      }
-    );
-
-    setLetters((prev) =>
-      prev.map((l) => (l.id === letterId ? { ...l, reaction } : l))
-    );
-    if (activeLetter && activeLetter.id === letterId) {
-      setActiveLetter({ ...activeLetter, reaction });
-    }
-  };
-
-  const handleDeleteLetter = async (letterId: string) => {
-    if (!activeUsername) return;
-    const storedToken =
-      token ||
-      (typeof window !== "undefined"
-        ? localStorage.getItem(`chithi:token:${activeUsername.toLowerCase()}`)
-        : null);
-
-    await fetch(
-      `/api/letters/${letterId}?username=${encodeURIComponent(
-        activeUsername.toLowerCase()
-      )}`,
-      {
-        method: "DELETE",
-        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
-      }
-    );
-    setLetters((prev) => prev.filter((l) => l.id !== letterId));
-    setIsReaderOpen(false);
-  };
-
-  const handlePublishLetter = async (letterId: string) => {
-    if (!activeUsername) return;
-    const storedToken =
-      token ||
-      (typeof window !== "undefined"
-        ? localStorage.getItem(`chithi:token:${activeUsername.toLowerCase()}`)
-        : null);
-
-    const res = await fetch(
-      `/api/letters/${letterId}/publish?username=${encodeURIComponent(
-        activeUsername.toLowerCase()
-      )}`,
-      {
-        method: "POST",
-        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
-      }
-    );
-    const json = await res.json();
-    if (!json.ok) {
-      throw new Error(json.error?.message || "errors.generic");
-    }
-    setLetters((prev) =>
-      prev.map((l) => (l.id === letterId ? { ...l, published: true } : l))
-    );
-  };
-
-  const handleDownloadPostcard = () => {
-    if (activeUsername) {
-      router.push(`/inbox/${activeUsername}`);
-    }
-  };
-
-  const handleReportLetter = () => {
-    if (activeUsername) {
-      router.push(`/inbox/${activeUsername}`);
+  // Stat Card click routing: Directly routes to /inbox/${username}?filter=...
+  const handleStatCardClick = (filter: "unread" | "all") => {
+    if (profileData?.username) {
+      router.push(`/inbox/${profileData.username}?filter=${filter}`);
     }
   };
 
@@ -332,12 +171,6 @@ export default function ProfilePage() {
       : profileData
       ? `https://mychithi.vercel.app/${profileData.username}`
       : "";
-
-  // Filtered letters list
-  const filteredLetters = letters.filter((l) => {
-    if (activeFilter === "unread") return !l.isOpened;
-    return true;
-  });
 
   return (
     <PageShell>
@@ -503,21 +336,20 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* 1. Header Card (Monogram, Username, Gender, Live Countdown) */}
+            {/* 1. Header Card (Monogram, Username, Gender, Compact Live Countdown) */}
             <ProfileHeaderCard
               username={profileData.username}
               gender={profileData.gender}
               expiresAt={profileData.expiresAt}
             />
 
-            {/* 2. Interactive Authoritative Mailbox Statistics Row (Clickable Tile Filters) */}
+            {/* 2. Interactive Authoritative Mailbox Statistics Row (Direct Route to Inbox) */}
             <ProfileStatsGrid
               username={profileData.username}
               unreadCount={profileData.unreadCount}
               totalEnvelopeCount={profileData.totalEnvelopeCount}
               acceptsBottles={profileData.acceptsBottles}
-              activeFilter={activeFilter}
-              onFilterChange={handleFilterChange}
+              onFilterChange={handleStatCardClick}
             />
 
             {/* 3. Prominent Hero CTA: Standalone "Open Secret Inbox" Banner (Directly between Stat Cards and Public Link) */}
@@ -532,85 +364,6 @@ export default function ProfilePage() {
                 </button>
               </Link>
             </div>
-
-            {/* Interactive Letter Grid / Tile View when Stat Card is Clicked */}
-            {activeFilter && (
-              <div className="p-6 sm:p-7 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-amber-400/40 shadow-xl space-y-5 animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="flex items-center justify-between border-b border-[#F0E2D2] dark:border-[#351D4D] pb-3">
-                  <div className="flex items-center gap-2">
-                    <Filter size={16} className="text-[#E88B60]" />
-                    <h3 className="font-serif font-bold text-base text-[#2C1E16] dark:text-[#FFF8F0]">
-                      {activeFilter === "unread"
-                        ? locale === "bn"
-                          ? `অপঠিত চিঠিসমূহ (${profileData.unreadCount})`
-                          : `Unread Envelopes (${profileData.unreadCount})`
-                        : locale === "bn"
-                        ? `মোট প্রাপ্ত চিঠিসমূহ (${profileData.totalEnvelopeCount})`
-                        : `Total Envelopes (${profileData.totalEnvelopeCount})`}
-                    </h3>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Filter quick-toggle tabs */}
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilter("unread")}
-                      className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${
-                        activeFilter === "unread"
-                          ? "bg-amber-400 text-stone-950 font-bold shadow-xs"
-                          : "bg-[#FAF7F2] dark:bg-[#1E0F2E] text-[#7C7069] dark:text-[#A8988B] hover:text-[#2C1E16]"
-                      }`}
-                    >
-                      {locale === "bn" ? "অপঠিত" : "Unread"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilter("all")}
-                      className={`px-3 py-1 rounded-full text-xs font-mono transition-all ${
-                        activeFilter === "all"
-                          ? "bg-amber-400 text-stone-950 font-bold shadow-xs"
-                          : "bg-[#FAF7F2] dark:bg-[#1E0F2E] text-[#7C7069] dark:text-[#A8988B] hover:text-[#2C1E16]"
-                      }`}
-                    >
-                      {locale === "bn" ? "সকল" : "All"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilter(null)}
-                      className="w-7 h-7 rounded-full hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center text-[#7C7069] hover:text-[#D9534F] transition-colors ml-1"
-                      title="Close Tile View"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                </div>
-
-                {filteredLetters.length === 0 ? (
-                  <div className="py-8 text-center space-y-2">
-                    <Mailbox size={32} className="mx-auto text-[#A8988B]" />
-                    <p className="text-xs text-[#7C7069] dark:text-[#A8988B]">
-                      {activeFilter === "unread"
-                        ? locale === "bn"
-                          ? "কোনো অপঠিত চিঠি নেই।"
-                          : "No unread letters at the moment."
-                        : locale === "bn"
-                        ? "এখনো কোনো চিঠি আসেনি।"
-                        : "No letters received yet."}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredLetters.map((ltr) => (
-                      <EnvelopeCard
-                        key={ltr.id}
-                        letter={ltr}
-                        onClick={() => handleOpenLetter(ltr.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* 4. Public Mailbox URL Card (One-Tap Copy) */}
             <div className="relative p-6 sm:p-7 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl space-y-3 overflow-hidden transition-colors">
@@ -637,7 +390,7 @@ export default function ProfilePage() {
                   variant="outline"
                   size="lg"
                   onClick={() => setIsPasscodeModalOpen(true)}
-                  className="w-full rounded-full border-[#F0E2D2] dark:border-[#351D4D] hover:bg-[#FAF7F2] dark:hover:bg-[#1E0F2E] text-[#2C1E16] dark:text-[#FFF8F0] gap-2 text-xs sm:text-sm font-medium"
+                  className="w-full rounded-full border-[#F0E2D2] dark:border-[#351D4D] hover:bg-[#FAF7F2] dark:hover:bg-[#1E0F2E] text-[#2C1E16] dark:text-[#FFF8F0] gap-2 text-xs sm:text-sm font-medium cursor-pointer"
                 >
                   <KeyRound size={16} className="text-[#E88B60]" />
                   <span>{t("profile.actions.passcodeInfo")}</span>
@@ -649,7 +402,7 @@ export default function ProfilePage() {
                   variant="secondary"
                   size="lg"
                   onClick={() => setIsDisconnectModalOpen(true)}
-                  className="w-full rounded-full bg-[#FAF7F2] dark:bg-[#1E0F2E] hover:bg-[#EBE3D5] dark:hover:bg-[#2B143D] text-[#D9534F] border border-[#F0E2D2] dark:border-[#351D4D] gap-2 text-xs sm:text-sm font-medium"
+                  className="w-full rounded-full bg-[#FAF7F2] dark:bg-[#1E0F2E] hover:bg-[#EBE3D5] dark:hover:bg-[#2B143D] text-[#D9534F] border border-[#F0E2D2] dark:border-[#351D4D] gap-2 text-xs sm:text-sm font-medium cursor-pointer"
                 >
                   <LogOut size={16} strokeWidth={1.5} />
                   <span>{t("profile.actions.disconnect")}</span>
@@ -659,19 +412,6 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
-
-      {/* Full Letter Reader Modal */}
-      <LetterReader
-        letter={activeLetter}
-        isOpen={isReaderOpen}
-        onClose={() => setIsReaderOpen(false)}
-        onReact={handleReactToLetter}
-        onDelete={handleDeleteLetter}
-        onPublish={handlePublishLetter}
-        onDownloadPostcard={handleDownloadPostcard}
-        onReport={handleReportLetter}
-        username={activeUsername || ""}
-      />
 
       {/* Passcode Security Information Modal */}
       <PasscodeInfoModal
@@ -707,7 +447,7 @@ export default function ProfilePage() {
               variant="outline"
               size="md"
               onClick={() => setIsDisconnectModalOpen(false)}
-              className="rounded-full border-[#EBE3D5] text-[#7C7069]"
+              className="rounded-full border-[#EBE3D5] text-[#7C7069] cursor-pointer"
             >
               {t("profile.actions.cancelBtn")}
             </Button>
@@ -716,7 +456,7 @@ export default function ProfilePage() {
               variant="primary"
               size="md"
               onClick={handleDisconnect}
-              className="rounded-full bg-[#D9534F] hover:bg-[#C2433F] text-white"
+              className="rounded-full bg-[#D9534F] hover:bg-[#C2433F] text-white cursor-pointer"
             >
               {t("profile.actions.confirmBtn")}
             </Button>
