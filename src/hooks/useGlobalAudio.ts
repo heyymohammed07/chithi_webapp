@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AttachedSong, CURATED_SONGS } from "@/lib/music";
+import { AttachedSong, DEFAULT_RADIO_SONG } from "@/lib/music";
 
 export function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds) || seconds < 0) return "00:00";
@@ -30,16 +30,15 @@ interface GlobalAudioState {
   duration: number;
 }
 
-// Global state in module scope for cross-component sync
+// ── Strict 10-Song FIFO Anti-Repeat History Buffer & Pre-Cache State ───────
 let listeners: Array<() => void> = [];
-
-// Pick initial random index immediately so state.currentSong is never null
-const initialRandomIndex =
-  CURATED_SONGS.length > 0 ? Math.floor(Math.random() * CURATED_SONGS.length) : 0;
-let playedIndices: number[] = [initialRandomIndex];
+const trackBuffer: AttachedSong[] = []; // Target 3 pre-cached ready tracks
+const historyQueue: AttachedSong[] = [];
+let recentPlayedIds: string[] = [DEFAULT_RADIO_SONG.youtubeId]; // Strict 10-track FIFO history
+let isReplenishing = false;
 
 const state: GlobalAudioState = {
-  currentSong: CURATED_SONGS[initialRandomIndex] || null,
+  currentSong: DEFAULT_RADIO_SONG,
   isPlaying: true,
   isMuted: false,
   volume: 0.15,
@@ -55,6 +54,62 @@ function emitChange() {
   }
 }
 
+// Preload thumbnail images in browser cache so transitions have 0ms visual pop
+function preloadThumbnail(thumbnailUrl: string) {
+  if (typeof window !== "undefined" && thumbnailUrl) {
+    try {
+      const img = new Image();
+      img.src = thumbnailUrl;
+    } catch {}
+  }
+}
+
+// Background buffer replenishment (maintains 3 ready unplayed tracks)
+async function replenishBuffer() {
+  if (isReplenishing || trackBuffer.length >= 3) return;
+  isReplenishing = true;
+
+  try {
+    while (trackBuffer.length < 3) {
+      const excludeList = Array.from(
+        new Set([
+          ...recentPlayedIds,
+          ...trackBuffer.map((t) => t.youtubeId),
+          state.currentSong?.youtubeId || "",
+        ])
+      ).filter(Boolean);
+
+      const excludeParam = encodeURIComponent(excludeList.slice(-10).join(","));
+      const res = await fetch(`/api/music/random?exclude=${excludeParam}`);
+      const json = await res.json();
+
+      if (json.ok && json.data?.song) {
+        const song: AttachedSong = json.data.song;
+        const alreadyBuffered = trackBuffer.some((q) => q.youtubeId === song.youtubeId);
+        const isCurrent = state.currentSong?.youtubeId === song.youtubeId;
+        const isRecent = recentPlayedIds.includes(song.youtubeId);
+
+        if (!alreadyBuffered && !isCurrent && !isRecent) {
+          trackBuffer.push(song);
+          preloadThumbnail(song.thumbnail);
+        } else if (!alreadyBuffered && !isCurrent) {
+          // If queue was running low and only recent was returned, add it
+          trackBuffer.push(song);
+          preloadThumbnail(song.thumbnail);
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+  } catch (err) {
+    console.warn("[replenishBuffer error]", err);
+  } finally {
+    isReplenishing = false;
+  }
+}
+
 export function useGlobalAudio() {
   const [, setTick] = useState(0);
 
@@ -62,16 +117,19 @@ export function useGlobalAudio() {
     const listener = () => setTick((t) => t + 1);
     listeners.push(listener);
 
-    // If for any reason state.currentSong was null, ensure a random pick
-    if (!state.currentSong && CURATED_SONGS.length > 0) {
-      const randomIdx = Math.floor(Math.random() * CURATED_SONGS.length);
-      state.currentSong = CURATED_SONGS[randomIdx] || CURATED_SONGS[0] || null;
-      playedIndices = [randomIdx];
-      emitChange();
-    }
-
-    // Load persisted mute & shuffle states
+    // Initial session storage hydration for strict 10-song history
     if (typeof window !== "undefined") {
+      try {
+        const storedHistory = sessionStorage.getItem("chithi:audio:recent_played");
+        if (storedHistory) {
+          const parsed = JSON.parse(storedHistory);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            recentPlayedIds = parsed.slice(-10);
+          }
+        }
+      } catch {}
+
+      // Load persisted mute & shuffle states
       const savedMute = localStorage.getItem("chithi:audio:muted");
       if (savedMute !== null) {
         state.isMuted = savedMute === "true";
@@ -82,26 +140,50 @@ export function useGlobalAudio() {
       }
     }
 
+    // Bootstrap initial radio queue & pre-warm 3 tracks
+    if (!state.currentSong) {
+      state.currentSong = DEFAULT_RADIO_SONG;
+      emitChange();
+    }
+    replenishBuffer();
+
     return () => {
       listeners = listeners.filter((l) => l !== listener);
     };
   }, []);
 
   const playSong = useCallback((song: AttachedSong) => {
-    state.currentSong = song;
-    const idx = CURATED_SONGS.findIndex((s) => s.youtubeId === song.youtubeId);
-    if (idx !== -1 && !playedIndices.includes(idx)) {
-      playedIndices.push(idx);
+    if (state.currentSong && state.currentSong.youtubeId !== song.youtubeId) {
+      historyQueue.push(state.currentSong);
+      if (historyQueue.length > 10) historyQueue.shift();
     }
+    state.currentSong = song;
+
+    // Strict 10-track FIFO history update
+    recentPlayedIds.push(song.youtubeId);
+    if (recentPlayedIds.length > 10) recentPlayedIds.shift();
+
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem("chithi:audio:recent_played", JSON.stringify(recentPlayedIds));
+      } catch {}
+    }
+
     state.isPlaying = true;
     state.currentTime = 0;
     emitChange();
+    replenishBuffer();
   }, []);
 
   const updateLiveMetadata = useCallback((meta: { title?: string; artist?: string }) => {
     if (!state.currentSong) return;
     let changed = false;
-    const cleanTitle = meta.title?.replace(/\s*\(.*?\)\s*/g, " ")?.replace(/\s*-\s*Topic/gi, "")?.trim();
+    const cleanTitle = meta.title
+      ?.replace(/\s*\(.*?\)\s*/g, " ")
+      ?.replace(/\s*\[.*?\]\s*/g, " ")
+      ?.replace(/\s*-\s*Topic/gi, "")
+      ?.replace(/\s*Official\s*(Audio|Video|Lyrical Video|Track)\s*/gi, "")
+      ?.trim();
     const cleanArtist = meta.artist?.replace(/\s*-\s*Topic/gi, "")?.trim();
 
     if (cleanTitle && cleanTitle !== state.currentSong.title) {
@@ -163,135 +245,91 @@ export function useGlobalAudio() {
     emitChange();
   }, []);
 
-  const nextSong = useCallback(() => {
-    if (CURATED_SONGS.length === 0) return;
-
-    if (state.isShuffle) {
-      if (playedIndices.length >= CURATED_SONGS.length) {
-        const currentIdx = CURATED_SONGS.findIndex(
-          (s) => s.youtubeId === state.currentSong?.youtubeId
-        );
-        playedIndices = currentIdx !== -1 ? [currentIdx] : [];
-      }
-
-      const unplayed = CURATED_SONGS.map((_, idx) => idx).filter(
-        (idx) => !playedIndices.includes(idx)
-      );
-
-      const randomUnplayed =
-        unplayed.length > 0
-          ? unplayed[Math.floor(Math.random() * unplayed.length)]
-          : undefined;
-      const fallbackIdx =
-        (CURATED_SONGS.findIndex(
-          (s) => s.youtubeId === state.currentSong?.youtubeId
-        ) + 1) % CURATED_SONGS.length;
-      const chosenIdx: number =
-        typeof randomUnplayed === "number"
-          ? randomUnplayed
-          : fallbackIdx >= 0
-          ? fallbackIdx
-          : 0;
-
-      playedIndices.push(chosenIdx);
-      state.currentSong = CURATED_SONGS[chosenIdx] || CURATED_SONGS[0] || null;
-    } else {
-      const currentIndex = CURATED_SONGS.findIndex(
-        (s) => s.youtubeId === state.currentSong?.youtubeId
-      );
-      const nextIndex =
-        currentIndex === -1 ? 0 : (currentIndex + 1) % CURATED_SONGS.length;
-      state.currentSong = CURATED_SONGS[nextIndex] || CURATED_SONGS[0] || null;
+  // ── Instant Zero-Delay Advance (Next Track from Pre-Cache Buffer) ──────────
+  const advanceNextTrack = useCallback(async (): Promise<string> => {
+    if (state.currentSong) {
+      historyQueue.push(state.currentSong);
+      if (historyQueue.length > 10) historyQueue.shift();
     }
 
-    state.isPlaying = true;
-    state.currentTime = 0;
-    emitChange();
-  }, []);
+    // 1. Instant pop from pre-cache buffer (0ms latency, pre-cached image)
+    if (trackBuffer.length > 0) {
+      const nextSong = trackBuffer.shift()!;
+      state.currentSong = nextSong;
 
-  const nextSongId = useCallback((): string | null => {
-    if (CURATED_SONGS.length === 0) return null;
+      // Update strict 10-track FIFO history
+      recentPlayedIds.push(nextSong.youtubeId);
+      if (recentPlayedIds.length > 10) recentPlayedIds.shift();
 
-    let chosenSong: (typeof CURATED_SONGS)[number] | null = null;
-
-    if (state.isShuffle) {
-      if (playedIndices.length >= CURATED_SONGS.length) {
-        const currentIdx = CURATED_SONGS.findIndex(
-          (s) => s.youtubeId === state.currentSong?.youtubeId
-        );
-        playedIndices = currentIdx !== -1 ? [currentIdx] : [];
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("chithi:audio:recent_played", JSON.stringify(recentPlayedIds));
+        } catch {}
       }
-      const unplayed = CURATED_SONGS.map((_, idx) => idx).filter(
-        (idx) => !playedIndices.includes(idx)
-      );
-      const randomUnplayed =
-        unplayed.length > 0
-          ? unplayed[Math.floor(Math.random() * unplayed.length)]
-          : undefined;
-      const fallbackIdx =
-        (CURATED_SONGS.findIndex(
-          (s) => s.youtubeId === state.currentSong?.youtubeId
-        ) + 1) % CURATED_SONGS.length;
-      const chosenIdx: number =
-        typeof randomUnplayed === "number"
-          ? randomUnplayed
-          : fallbackIdx >= 0
-          ? fallbackIdx
-          : 0;
-      playedIndices.push(chosenIdx);
-      chosenSong = CURATED_SONGS[chosenIdx] || CURATED_SONGS[0] || null;
-    } else {
-      const currentIndex = CURATED_SONGS.findIndex(
-        (s) => s.youtubeId === state.currentSong?.youtubeId
-      );
-      const nextIndex =
-        currentIndex === -1 ? 0 : (currentIndex + 1) % CURATED_SONGS.length;
-      chosenSong = CURATED_SONGS[nextIndex] || CURATED_SONGS[0] || null;
+
+      state.isPlaying = true;
+      state.currentTime = 0;
+      emitChange();
+
+      // Refill pre-cache buffer in background (non-blocking)
+      replenishBuffer();
+      return nextSong.youtubeId;
     }
 
-    state.currentSong = chosenSong;
+    // 2. On-demand fetch if buffer was empty
+    try {
+      const excludeParam = encodeURIComponent(recentPlayedIds.slice(-10).join(","));
+      const res = await fetch(`/api/music/random?exclude=${excludeParam}`);
+      const json = await res.json();
+      if (json.ok && json.data?.song) {
+        const song: AttachedSong = json.data.song;
+        state.currentSong = song;
+
+        recentPlayedIds.push(song.youtubeId);
+        if (recentPlayedIds.length > 10) recentPlayedIds.shift();
+
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem("chithi:audio:recent_played", JSON.stringify(recentPlayedIds));
+          } catch {}
+        }
+
+        state.isPlaying = true;
+        state.currentTime = 0;
+        emitChange();
+        replenishBuffer();
+        return song.youtubeId;
+      }
+    } catch (err) {
+      console.error("[advanceNextTrack error]", err);
+    }
+
+    state.currentSong = DEFAULT_RADIO_SONG;
     state.isPlaying = true;
-    state.currentTime = 0;
     emitChange();
-    return chosenSong?.youtubeId ?? null;
+    return DEFAULT_RADIO_SONG.youtubeId;
   }, []);
 
-  const prevSong = useCallback(() => {
-    if (CURATED_SONGS.length === 0) return;
-    const currentIndex = CURATED_SONGS.findIndex(
-      (s) => s.youtubeId === state.currentSong?.youtubeId
-    );
-    const prevIndex =
-      currentIndex === -1
-        ? 0
-        : (currentIndex - 1 + CURATED_SONGS.length) % CURATED_SONGS.length;
-    state.currentSong = CURATED_SONGS[prevIndex] || CURATED_SONGS[0] || null;
-    state.isPlaying = true;
-    state.currentTime = 0;
-    emitChange();
-  }, []);
+  // ── Instant Zero-Delay History (Previous Track) ────────────────────────────
+  const advancePrevTrack = useCallback(async (): Promise<string> => {
+    if (historyQueue.length > 0) {
+      const prevSong = historyQueue.pop()!;
+      state.currentSong = prevSong;
+      state.isPlaying = true;
+      state.currentTime = 0;
+      emitChange();
+      return prevSong.youtubeId;
+    }
 
-  const prevSongId = useCallback((): string | null => {
-    if (CURATED_SONGS.length === 0) return null;
-    const currentIndex = CURATED_SONGS.findIndex(
-      (s) => s.youtubeId === state.currentSong?.youtubeId
-    );
-    const prevIndex =
-      currentIndex === -1
-        ? 0
-        : (currentIndex - 1 + CURATED_SONGS.length) % CURATED_SONGS.length;
-    const chosenSong = CURATED_SONGS[prevIndex] || CURATED_SONGS[0] || null;
-    state.currentSong = chosenSong;
-    state.isPlaying = true;
-    state.currentTime = 0;
-    emitChange();
-    return chosenSong?.youtubeId ?? null;
-  }, []);
+    return advanceNextTrack();
+  }, [advanceNextTrack]);
 
   return {
     ...state,
     playSong,
     updateLiveMetadata,
+    advanceNextTrack,
+    advancePrevTrack,
     togglePlay,
     setIsPlaying,
     toggleMute,
@@ -300,9 +338,5 @@ export function useGlobalAudio() {
     toggleExpand,
     setCurrentTime,
     setDuration,
-    nextSong,
-    nextSongId,
-    prevSong,
-    prevSongId,
   };
 }

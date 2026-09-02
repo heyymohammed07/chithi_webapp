@@ -6,9 +6,9 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useLocale } from "@/hooks/useLocale";
-import { AttachedSong, CURATED_SONGS } from "@/lib/music";
+import { AttachedSong, DEFAULT_RADIO_SONG } from "@/lib/music";
 import { getThumbnailUrl } from "@/hooks/useGlobalAudio";
-import { Music, Search, Check, Sparkles, Disc } from "lucide-react";
+import { Search, Check, Sparkles, Disc } from "lucide-react";
 
 export interface SongAttachmentModalProps {
   isOpen: boolean;
@@ -34,7 +34,7 @@ function SongThumbnail({ song }: { song: AttachedSong }) {
       src={resolvedUrl}
       alt={song.title}
       onError={() => setError(true)}
-      className="w-full h-full object-cover"
+      className="w-full h-full object-cover scale-[1.75]"
     />
   );
 }
@@ -47,150 +47,130 @@ export function SongAttachmentModal({
 }: SongAttachmentModalProps) {
   const { locale } = useLocale();
   const [query, setQuery] = useState("");
-  const [songs, setSongs] = useState<AttachedSong[]>(CURATED_SONGS);
+  const [songs, setSongs] = useState<AttachedSong[]>([DEFAULT_RADIO_SONG]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    if (!query.trim()) {
-      setSongs(CURATED_SONGS);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     const timeout = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/music/search?q=${encodeURIComponent(query.trim())}`);
+        const searchQuery = query.trim() || "classic bangla song";
+        const res = await fetch(`/api/music/search?q=${encodeURIComponent(searchQuery)}`);
         const json = await res.json();
         if (json.ok && json.data?.songs) {
           setSongs(json.data.songs);
-        } else {
-          setSongs(CURATED_SONGS);
         }
-      } catch {
-        setSongs(CURATED_SONGS);
+      } catch (err) {
+        console.error("[SongAttachmentModal search error]", err);
       } finally {
         setLoading(false);
       }
-    }, 350);
+    }, query.trim() ? 350 : 0);
 
     return () => clearTimeout(timeout);
   }, [query, isOpen]);
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-lg">
-      <div className="space-y-5 text-left p-1">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-[#FFE5B4] dark:bg-[#2B143D] border border-[#FCD34D] dark:border-[#52336B] flex items-center justify-center text-[#E88B60] shadow-sm">
-            <Music size={20} strokeWidth={1.5} />
-          </div>
-          <div>
-            <span className="text-[11px] font-mono uppercase tracking-wider text-[#857367] dark:text-[#A592A4] block">
-              Acoustic Soundtrack
-            </span>
-            <h3 className="text-lg font-serif font-bold text-[#382A22] dark:text-[#FFF8F0]">
-              {locale === "bn" ? "চিঠির সাথে গান যুক্ত করুন" : "Attach a Song to Letter"}
-            </h3>
-          </div>
-        </div>
+  const handleSelect = (song: AttachedSong) => {
+    onSelectSong(song);
+    onClose();
+  };
 
-        {/* Search input */}
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={locale === "bn" ? "গান যুক্ত করুন" : "Attach a Song"}
+      maxWidth="max-w-lg"
+    >
+      <div className="space-y-4 pt-2">
+        {/* Subtitle Description */}
+        <p className="text-xs text-[#857367] dark:text-[#A592A4] font-serif italic">
+          {locale === "bn"
+            ? "চিঠির সাথে একটি গান যুক্ত করুন যা প্রাপকের পড়ার সময় বাজবে।"
+            : "Attach a soundtrack to play while the recipient reads your letter."}
+        </p>
+
+        {/* Search Bar */}
         <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#857367] dark:text-[#A592A4]">
+            <Search size={18} />
+          </div>
           <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
             placeholder={
               locale === "bn"
-                ? "বাংলা গান বা শিল্পীর নাম দিয়ে খুঁজুন..."
-                : "Search acoustic song or artist..."
+                ? "গানের নাম বা শিল্পীর নাম দিয়ে খুঁজুন..."
+                : "Search classic songs or artists..."
             }
-            className="pl-10 rounded-full"
-          />
-          <Search
-            size={16}
-            className="absolute left-3.5 top-3.5 text-[#857367] dark:text-[#A592A4]"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full pl-10 rounded-2xl bg-[#FFF8F0] dark:bg-[#1E0F2E] border-[#F0E2D2] dark:border-[#351D4D]"
           />
         </div>
 
-        {/* Songs List */}
-        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-          <div className="flex items-center gap-1.5 text-xs text-[#857367] dark:text-[#A592A4] px-1 pb-1">
-            <Sparkles size={13} className="text-[#E88B60]" />
-            <span>
-              {!query.trim()
-                ? locale === "bn"
-                  ? "বাছাই করা বাংলা নস্টালজিক সুর"
-                  : "Curated Bengali Acoustic Songs"
-                : locale === "bn"
-                ? "অনুসন্ধানের ফলাফল"
-                : "Search Results"}
-            </span>
-          </div>
-
+        {/* Dynamic Songs List */}
+        <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
           {loading ? (
             <div className="py-8 text-center text-xs font-mono text-[#857367] dark:text-[#A592A4] animate-pulse">
-              {locale === "bn" ? "গান খোঁজা হচ্ছে..." : "Searching music..."}
+              {locale === "bn" ? "গান খোঁজা হচ্ছে..." : "Searching YouTube Music tracks..."}
             </div>
           ) : songs.length === 0 ? (
             <div className="py-8 text-center text-xs text-[#857367] dark:text-[#A592A4]">
-              {locale === "bn"
-                ? "কোনো গান পাওয়া যায়নি। অন্য নামে চেষ্টা করুন।"
-                : "No songs found. Try another query."}
+              {locale === "bn" ? "কোনো গান পাওয়া যায়নি" : "No songs found for this query"}
             </div>
           ) : (
             songs.map((song) => {
               const isSelected = currentSong?.youtubeId === song.youtubeId;
-
               return (
-                <div
-                  key={song.id || song.youtubeId}
-                  className={`flex items-center justify-between gap-3 p-2.5 rounded-2xl border transition-all ${
+                <button
+                  key={song.youtubeId || song.id}
+                  type="button"
+                  onClick={() => handleSelect(song)}
+                  className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left group cursor-pointer ${
                     isSelected
-                      ? "bg-[#FFE5B4]/80 dark:bg-[#2B143D] border-[#FCD34D] dark:border-[#52336B] shadow-sm"
-                      : "bg-[#FFF8F0] dark:bg-[#1E0F2E] border-[#F0E2D2] dark:border-[#351D4D] hover:border-[#E88B60] hover:bg-[#FFE5B4]/20 dark:hover:bg-[#2B143D]/50"
+                      ? "bg-[#FFE5B4]/60 dark:bg-[#351D4D] border-[#E88B60] shadow-sm"
+                      : "bg-[#FFFDF9] dark:bg-[#170A24] border-[#F0E2D2] dark:border-[#351D4D]/60 hover:border-[#E88B60]/60 hover:bg-[#FFF8F0] dark:hover:bg-[#231235]"
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-[#FFE5B4]/30 dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shrink-0">
+                    <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#F0E2D2] dark:border-[#351D4D] relative bg-[#FFE5B4]/30 flex items-center justify-center">
                       <SongThumbnail song={song} />
                     </div>
-
                     <div className="min-w-0">
-                      <h4 className="text-xs sm:text-sm font-serif font-bold text-[#382A22] dark:text-[#FFF8F0] truncate">
+                      <div className="text-sm font-serif font-bold text-[#382A22] dark:text-[#FFF8F0] truncate group-hover:text-[#E88B60] transition-colors">
                         {song.title}
-                      </h4>
-                      <p className="text-[11px] text-[#857367] dark:text-[#A592A4] truncate">
+                      </div>
+                      <div className="text-xs text-[#857367] dark:text-[#A592A4] truncate">
                         {song.artist}
-                      </p>
+                      </div>
                     </div>
                   </div>
 
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={isSelected ? "primary" : "outline"}
-                    onClick={() => {
-                      onSelectSong(song);
-                      onClose();
-                    }}
-                    className="rounded-full shrink-0 text-xs gap-1"
-                  >
-                    {isSelected ? (
-                      <>
-                        <Check size={14} />
-                        <span>{locale === "bn" ? "যুক্ত আছে" : "Attached"}</span>
-                      </>
-                    ) : (
-                      <span>{locale === "bn" ? "যুক্ত করুন" : "Attach"}</span>
-                    )}
-                  </Button>
-                </div>
+                  {isSelected ? (
+                    <div className="w-7 h-7 rounded-full bg-[#E88B60] text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <Check size={14} strokeWidth={2.5} />
+                    </div>
+                  ) : (
+                    <div className="text-xs font-mono text-[#857367] dark:text-[#A592A4] group-hover:text-[#E88B60] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {locale === "bn" ? "নির্বাচন" : "Select"}
+                    </div>
+                  )}
+                </button>
               );
             })
           )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-between pt-3 border-t border-[#F0E2D2] dark:border-[#351D4D]">
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#857367] dark:text-[#A592A4]">
+            <Sparkles size={12} className="text-[#E88B60]" />
+            <span>{locale === "bn" ? "অফিসিয়াল স্টুডিও অডিও" : "Official Studio Audio"}</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {locale === "bn" ? "বাতিল" : "Cancel"}
+          </Button>
         </div>
       </div>
     </Modal>

@@ -1,19 +1,28 @@
 import { NextRequest } from "next/server";
-import ytSearch from "yt-search";
+import ytSearch, { VideoSearchResult } from "yt-search";
 import { apiOk, apiErr, getViewerHash } from "@/lib/api";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { AttachedSong, CURATED_SONGS } from "@/lib/music";
+import { AttachedSong, DYNAMIC_DISCOVERY_POOLS, DEFAULT_RADIO_SONG } from "@/lib/music";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function cleanString(str: string): string {
+  return str
+    .replace(/\s*\(.*?\)\s*/g, " ")
+    .replace(/\s*\[.*?\]\s*/g, " ")
+    .replace(/\s*-\s*Topic/gi, "")
+    .replace(/\s*Official\s*(Audio|Video|Lyrical Video|Track)\s*/gi, "")
+    .replace(/\|\s*Audio\s*\|.*/i, "")
+    .replace(/\|\s*Lyrics\s*\|.*/i, "")
+    .replace(/\|\s*#\w+.*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const q = url.searchParams.get("q")?.trim();
-
-  if (!q) {
-    return apiOk({ songs: CURATED_SONGS });
-  }
+  const q = url.searchParams.get("q")?.trim() || DYNAMIC_DISCOVERY_POOLS[0] || "bangla 90s 2000s pop nostalgia topic audio";
 
   // Rate limit: 15 searches / 1m per viewer hash (CWE-400 mitigation)
   const viewerHash = getViewerHash(req);
@@ -36,20 +45,20 @@ export async function GET(req: NextRequest) {
 
   try {
     const searchResults = await ytSearch(q);
-    const videos = searchResults.videos.slice(0, 10);
+    const videos: VideoSearchResult[] = searchResults.videos || [];
 
-    const songs: AttachedSong[] = videos.map((v) => ({
+    const songs: AttachedSong[] = videos.slice(0, 10).map((v: VideoSearchResult) => ({
       id: v.videoId,
       youtubeId: v.videoId,
-      title: v.title,
-      artist: v.author?.name || "Artist",
+      title: cleanString(v.title) || v.title,
+      artist: cleanString(v.author?.name || "Artist"),
       thumbnail: v.thumbnail || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
       duration: v.seconds,
     }));
 
-    return apiOk({ songs: songs.length > 0 ? songs : CURATED_SONGS });
+    return apiOk({ songs: songs.length > 0 ? songs : [DEFAULT_RADIO_SONG] });
   } catch (error) {
-    console.error("[Music Search Fallback]", error);
-    return apiOk({ songs: CURATED_SONGS });
+    console.error("[Music Search Error]", error);
+    return apiOk({ songs: [DEFAULT_RADIO_SONG] });
   }
 }
