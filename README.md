@@ -49,7 +49,7 @@ cp .env.example .env.local
 ```bash
 pnpm dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [https://mychithi.vercel.app](https://mychithi.vercel.app) in your browser.
 
 ---
 
