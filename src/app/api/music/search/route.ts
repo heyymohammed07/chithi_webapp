@@ -124,9 +124,9 @@ export async function GET(req: NextRequest) {
       duration: v.seconds,
     }));
 
-    return apiOk({ songs: songs.length > 0 ? songs : DEFAULT_CURATED_SONGS });
+    return apiOk({ songs });
   } catch (error) {
     console.error("[/api/music/search error]", error);
-    return apiOk({ songs: DEFAULT_CURATED_SONGS });
+    return apiOk({ songs: [] });
   }
 }

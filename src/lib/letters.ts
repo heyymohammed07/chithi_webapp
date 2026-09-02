@@ -281,7 +281,10 @@ export async function getLetter(
     }
 
     // Decrement unread counter clamped to 0
-    await redis.decr(keys.mailboxUnread(usernameLower));
+    const unread = await redis.decr(keys.mailboxUnread(usernameLower));
+    if (unread < 0) {
+      await redis.set(keys.mailboxUnread(usernameLower), 0);
+    }
   }
 
   if (needsSave) {
