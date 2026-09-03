@@ -45,7 +45,7 @@
   },
   "packageManager": "pnpm@11.25.0",
   "engines": {
-    "node": ">=22.15"
+    "node": "22.x"
   },
   "overrides": {
     "postcss": ">=8.5.3",
