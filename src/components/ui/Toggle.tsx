@@ -38,8 +38,8 @@ export function Toggle({
         <div
           className={`w-11 h-6 rounded-full transition-colors duration-200 border ${
             checked
-              ? "bg-[#D9534F] border-[#D9534F]"
-              : "bg-[#EBE3D5] border-[#EBE3D5]"
+              ? "bg-wax border-wax"
+              : "bg-edge-subtle border-edge-subtle"
           }`}
         />
         <div
@@ -49,7 +49,7 @@ export function Toggle({
         />
       </div>
       {label && (
-        <span className="text-xs sm:text-sm font-medium text-[#2D2522] dark:text-stone-200 select-none">
+        <span className="text-xs sm:text-sm font-medium text-ink select-none">
           {label}
         </span>
       )}

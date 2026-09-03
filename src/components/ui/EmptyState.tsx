@@ -8,9 +8,9 @@ export interface EmptyStateProps {
 
 export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center text-center p-8 md:p-12 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] shadow-xl max-w-md mx-auto transition-colors">
+    <div className="flex flex-col items-center justify-center text-center p-8 md:p-12 border border-edge rounded-3xl bg-surface shadow-xl max-w-md mx-auto transition-colors">
       {/* Centred vintage envelope motif */}
-      <div className="w-16 h-16 mb-4 text-[#E88B60]">
+      <div className="w-16 h-16 mb-4 text-wax">
         <svg
           viewBox="0 0 64 64"
           fill="none"
@@ -25,10 +25,10 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
         </svg>
       </div>
 
-      <h3 className="text-lg font-serif font-semibold text-[#2C1E16] dark:text-[#FFF8F0] mb-1">
+      <h3 className="text-lg font-serif font-semibold text-ink mb-1">
         {title}
       </h3>
-      <p className="text-sm text-[#7C7069] dark:text-[#A8988B] mb-6 leading-relaxed">
+      <p className="text-sm text-ink-muted mb-6 leading-relaxed">
         {description}
       </p>
 

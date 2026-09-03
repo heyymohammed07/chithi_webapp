@@ -3,52 +3,94 @@
 @tailwind utilities;
 
 :root {
-  --ink: #382A22;
-  --ink-raised: #FFF8F0;
-  --ink-hairline: #F0E2D2;
-  --wax: #E88B60;
-  --wax-dim: #D67448;
-  --gold: #E88B60;
-  --gold-dim: #B86640;
-  --peach: #FFE5B4;
-  --ivory: #FFFDF9;
-  --ash: #857367;
-  --ash-dim: #A39992;
-  --success: #065F46;
-  --warn: #713F12;
-  --danger: #E88B60;
+  --canvas: hsl(38 100% 99%);
+  --surface: hsl(34 100% 97%);
+  --surface-raised: hsl(0 0% 100%);
+  --edge: hsl(32 50% 88%);
+  --edge-subtle: hsl(38 31% 88%);
+  --ink: hsl(22 24% 18%);
+  --ink-heading: hsl(22 33% 13%);
+  --ink-muted: hsl(25 13% 46%);
+  --ink-faint: hsl(25 8% 61%);
+  --wax: hsl(19 76% 64%);
+  --wax-dim: hsl(19 63% 56%);
+  --gold: hsl(19 76% 64%);
+  --gold-dim: hsl(19 48% 49%);
+  --peach: hsl(39 100% 85%);
+  --peach-hover: hsl(45 96% 65%);
+  --peach-text: hsl(26 53% 28%);
+  --ivory: hsl(38 100% 99%);
+  --danger: hsl(2 64% 58%);
+  --danger-surface: hsl(0 86% 97%);
+  --danger-edge: hsl(0 93% 82%);
+  --danger-text: hsl(0 74% 42%);
+  --success: hsl(163 88% 20%);
+  --success-surface: hsl(152 76% 90%);
+  --success-edge: hsl(152 76% 80%);
+  --success-text: hsl(163 88% 20%);
+  --warn: hsl(28 73% 26%);
+  --warn-surface: hsl(53 98% 77%);
+  --warn-edge: hsl(47 96% 77%);
+  --warn-text: hsl(28 73% 26%);
+  --lavender: hsl(326 78% 95%);
+  --lavender-text: hsl(336 69% 30%);
+  --skymist: hsl(204 94% 94%);
+  --skymist-text: hsl(206 55% 26%);
 
-  --primary: #FFE5B4;
-  --primary-hover: #FCD34D;
-  --primary-foreground: #382A22;
-  --stationery-canvas: #FFFDF9;
-  --stationery-card: #FFF8F0;
-  --stationery-border: #F0E2D2;
+  --primary: var(--peach);
+  --primary-hover: var(--peach-hover);
+  --primary-foreground: var(--ink);
+  --stationery-canvas: var(--canvas);
+  --stationery-card: var(--surface);
+  --stationery-border: var(--edge);
 }
 
 .dark {
-  --ink: #F5EBE6;
-  --ink-raised: #170A24;
-  --ink-hairline: #351D4D;
-  --wax: #E88B60;
-  --wax-dim: #D67448;
-  --gold: #FFE5B4;
-  --gold-dim: #E88B60;
-  --peach: #FFE5B4;
-  --ivory: #0C0314;
-  --ash: #A592A4;
-  --ash-dim: #705B73;
-  --primary: #FFE5B4;
-  --primary-hover: #FCD34D;
-  --primary-foreground: #382A22;
-  --stationery-canvas: #0C0314;
-  --stationery-card: #170A24;
-  --stationery-border: #351D4D;
+  --canvas: hsl(271 74% 5%);
+  --surface: hsl(269 57% 9%);
+  --surface-raised: hsl(270 49% 14%);
+  --edge: hsl(270 45% 21%);
+  --edge-subtle: hsl(270 48% 27%);
+  --ink: hsl(20 45% 93%);
+  --ink-heading: hsl(34 100% 97%);
+  --ink-muted: hsl(303 9% 61%);
+  --ink-faint: hsl(293 11% 41%);
+  --wax: hsl(19 76% 64%);
+  --wax-dim: hsl(19 63% 56%);
+  --gold: hsl(39 100% 85%);
+  --gold-dim: hsl(19 76% 64%);
+  --peach: hsl(39 100% 85%);
+  --peach-hover: hsl(45 96% 65%);
+  --peach-text: hsl(22 24% 18%);
+  --ivory: hsl(271 74% 5%);
+  --danger: hsl(0 84% 60%);
+  --danger-surface: hsl(348 43% 12%);
+  --danger-edge: hsl(351 48% 22%);
+  --danger-text: hsl(0 93% 82%);
+  --success: hsl(160 84% 39%);
+  --success-surface: hsl(156 48% 11%);
+  --success-edge: hsl(153 56% 20%);
+  --success-text: hsl(152 76% 80%);
+  --warn: hsl(42 96% 56%);
+  --warn-surface: hsl(35 56% 11%);
+  --warn-edge: hsl(35 57% 21%);
+  --warn-text: hsl(47 96% 77%);
+  --lavender: hsl(273 50% 16%);
+  --lavender-text: hsl(289 95% 91%);
+  --skymist: hsl(215 56% 14%);
+  --skymist-text: hsl(201 94% 86%);
+
+  --primary: var(--peach);
+  --primary-hover: var(--peach-hover);
+  --primary-foreground: var(--ink);
+  --stationery-canvas: var(--canvas);
+  --stationery-card: var(--surface);
+  --stationery-border: var(--edge);
 }
 
 body {
-  background-color: #FFFDF9;
-  color: #382A22;
+  background-color: var(--canvas);
+  color: var(--ink);
   font-family: var(--font-ui), var(--font-bn-ui), sans-serif;
   min-height: 100vh;
   margin: 0;
@@ -59,8 +101,8 @@ body {
 }
 
 .dark body {
-  background-color: #0C0314;
-  color: #F5EBE6;
+  background-color: var(--canvas);
+  color: var(--ink);
 }
 
 /* Locale-aware font swap */
@@ -84,37 +126,37 @@ body {
 
 /* Paper Textures (Pure CSS & SVG, no external images) */
 .paper-parchment {
-  background-color: #F5ECD8;
+  background-color: hsl(41 62% 90%);
   background-image:
     radial-gradient(ellipse at center, rgba(255, 255, 255, 0.45) 0%, rgba(138, 107, 76, 0.1) 80%, rgba(58, 42, 28, 0.18) 100%),
     repeating-radial-gradient(circle at 17% 23%, rgba(58, 42, 28, 0.02) 0, rgba(58, 42, 28, 0.02) 2px, transparent 3px);
-  color: #2D2522;
+  color: hsl(17 14% 16%);
   box-shadow: 0 12px 32px -10px rgba(78, 59, 44, 0.15), 0 1px 3px rgba(56, 41, 27, 0.15) inset;
 }
 
 .paper-midnight {
-  background-color: #1A1722;
+  background-color: hsl(257 19% 11%);
   background-image:
-    radial-gradient(1.5px 1.5px at 30px 40px, #E5BC8B 50%, rgba(0,0,0,0)),
+    radial-gradient(1.5px 1.5px at 30px 40px, hsl(33 66% 72%) 50%, rgba(0,0,0,0)),
     radial-gradient(1px 1px at 90px 140px, rgba(229, 188, 139, 0.8) 50%, rgba(0,0,0,0)),
-    radial-gradient(2px 2px at 200px 260px, #E5BC8B 50%, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 200px 260px, hsl(33 66% 72%) 50%, rgba(0,0,0,0)),
     radial-gradient(1px 1px at 320px 110px, rgba(229, 188, 139, 0.7) 50%, rgba(0,0,0,0)),
     linear-gradient(180deg, rgba(229, 188, 139, 0.05) 0%, rgba(26, 23, 34, 0.95) 100%);
-  color: #E5BC8B;
+  color: hsl(33 66% 72%);
   box-shadow: 0 12px 36px -8px rgba(26, 23, 34, 0.35), 0 1px 0 rgba(229, 188, 139, 0.2) inset;
 }
 
 .paper-rose {
-  background-color: #F8EBEA;
+  background-color: hsl(4 50% 95%);
   background-image:
     radial-gradient(circle at 90% 90%, rgba(221, 148, 154, 0.25) 0%, transparent 60%),
     radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.6) 0%, rgba(82, 46, 48, 0.05) 100%);
-  color: #4A2729;
+  color: hsl(356 30% 22%);
   box-shadow: 0 12px 30px -10px rgba(82, 46, 48, 0.15);
 }
 
 .paper-typewriter {
-  background-color: #F3EBD9;
+  background-color: hsl(42 48% 90%);
   background-image:
     repeating-linear-gradient(
       0deg,
@@ -124,17 +166,17 @@ body {
       rgba(100, 130, 170, 0.18) 32px
     );
   border-left: 3px solid rgba(217, 83, 79, 0.4);
-  color: #28241D;
+  color: hsl(38 16% 14%);
   box-shadow: 0 12px 30px -10px rgba(78, 59, 44, 0.15);
 }
 
 .paper-rainy {
-  background-color: #202730;
+  background-color: hsl(214 20% 16%);
   background-image:
     linear-gradient(115deg, rgba(226, 232, 240, 0.06) 0%, transparent 40%, rgba(226, 232, 240, 0.09) 42%, transparent 44%),
     linear-gradient(115deg, transparent 55%, rgba(226, 232, 240, 0.07) 57%, transparent 59%);
   background-size: 80px 80px;
-  color: #E2E8F0;
+  color: hsl(214 32% 91%);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 12px 36px -8px rgba(32, 39, 48, 0.4), 0 1px 0 rgba(226, 232, 240, 0.15) inset;
@@ -146,14 +188,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #FFFDF9;
+  background: var(--canvas);
 }
 ::-webkit-scrollbar-thumb {
-  background: #F0E2D2;
+  background: var(--edge);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #FFE5B4;
+  background: var(--peach);
 }
 
 /* Hide Next.js development badges & portals */
@@ -238,12 +280,12 @@ nextjs-portal,
 .postal-border-dashed {
   background-image: repeating-linear-gradient(
     -45deg,
-    #D9534F 0,
-    #D9534F 8px,
+    hsl(2 64% 58%) 0,
+    hsl(2 64% 58%) 8px,
     transparent 8px,
     transparent 14px,
-    #E0F2FE 14px,
-    #E0F2FE 22px,
+    hsl(204 94% 94%) 14px,
+    hsl(204 94% 94%) 22px,
     transparent 22px,
     transparent 28px
   );

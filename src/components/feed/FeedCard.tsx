@@ -46,7 +46,7 @@ export function FeedCard({ item, onReact, onReport }: FeedCardProps) {
 
   return (
     <>
-      <div className="break-inside-avoid mb-6 rounded-3xl border border-[#EBE3D5] dark:border-[#351D4D] bg-[#FFFDF9] dark:bg-[#170A24] overflow-hidden shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] hover:shadow-md transition-all">
+      <div className="break-inside-avoid mb-6 rounded-3xl border border-edge bg-canvas dark:bg-surface overflow-hidden shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] hover:shadow-md transition-all">
         {/* Card Body - Clicking opens modal (§13) */}
         <div
           role="button"
@@ -58,7 +58,7 @@ export function FeedCard({ item, onReact, onReport }: FeedCardProps) {
               setIsModalOpen(true);
             }
           }}
-          className="cursor-pointer relative overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D9534F] focus-visible:outline-offset-2"
+          className="cursor-pointer relative overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-wax focus-visible:outline-offset-2"
         >
           <PaperSurface
             paper={item.paper}
@@ -77,7 +77,7 @@ export function FeedCard({ item, onReact, onReport }: FeedCardProps) {
         </div>
 
         {/* Card Footer Toolbar */}
-        <div className="flex items-center justify-between p-3.5 bg-[#FAF7F2] dark:bg-[#12061C] border-t border-[#EBE3D5] dark:border-[#351D4D] text-xs">
+        <div className="flex items-center justify-between p-3.5 bg-surface border-t border-edge text-xs">
           {/* Reactions */}
           <div className="flex items-center gap-2">
             <ReactionButton
@@ -95,7 +95,7 @@ export function FeedCard({ item, onReact, onReport }: FeedCardProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#7C7069] dark:text-[#A592A4] font-serif italic">
+            <span className="text-[11px] text-ink-muted font-serif italic">
               {formatRelativeTime(item.createdAt, locale)}
             </span>
             <IconButton

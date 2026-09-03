@@ -1,11 +1,18 @@
 import { CreateMailboxInput, RecoverMailboxInput, UpdateSettingsInput } from "./schemas";
 import { MailboxRecord } from "./types";
-import { DURATIONS, SEVEN_DAYS_MS, SEVEN_DAYS_SECONDS } from "./constants";
+import { DURATIONS } from "./constants";
 import { keys } from "./keys";
 import { getRedis } from "./redis";
 import { generateAccessToken, generateRecoveryPasscode } from "./ids";
 import { hashWithPepper, timingSafeEqual } from "./crypto";
 import { ApiError } from "./api";
+
+export const TTL_GRACE_S = 60;
+
+/** Seconds until this mailbox's hard expiry, floored at 1. Single source of truth. */
+export function remainingTtlSeconds(mailbox: Pick<MailboxRecord, "expiresAt">): number {
+  return Math.max(1, Math.ceil((mailbox.expiresAt - Date.now()) / 1000));
+}
 
 export async function createMailbox(input: CreateMailboxInput): Promise<{
   username: string;
@@ -16,14 +23,15 @@ export async function createMailbox(input: CreateMailboxInput): Promise<{
   const redis = getRedis();
   const usernameLower = input.username.toLowerCase();
   const lifetimeSeconds = DURATIONS[input.durationKey];
+  const totalTtl = lifetimeSeconds + TTL_GRACE_S;
 
-  // 1. Reserve username with atomic SET NX EX to win squatting race (persists for 7-day inactive cycle)
+  // 1. Reserve username with atomic SET NX EX to win squatting race
   const reserved = await redis.set(
     keys.mailboxReservation(usernameLower),
     input.username,
     {
       nx: true,
-      ex: SEVEN_DAYS_SECONDS,
+      ex: totalTtl,
     }
   );
 
@@ -58,13 +66,13 @@ export async function createMailbox(input: CreateMailboxInput): Promise<{
   // 3. Store record, recovery hash, unread counter, and add to bottle pools
   const pipeline = redis.pipeline();
   pipeline.set(keys.mailbox(usernameLower), JSON.stringify(mailboxRecord), {
-    ex: SEVEN_DAYS_SECONDS,
+    ex: totalTtl,
   });
   pipeline.set(keys.mailboxRecovery(usernameLower), recoveryPasscodeHash, {
-    ex: SEVEN_DAYS_SECONDS,
+    ex: totalTtl,
   });
-  pipeline.set(keys.mailboxUnread(usernameLower), 0, { ex: SEVEN_DAYS_SECONDS });
-  pipeline.zadd("mb:active", { score: now, member: usernameLower });
+  pipeline.set(keys.mailboxUnread(usernameLower), 0, { ex: totalTtl });
+  pipeline.zadd(keys.activeIndex(), { score: now, member: usernameLower });
 
   // Add to bottle pools by default
   pipeline.zadd(keys.bottlePool("any"), {
@@ -144,15 +152,12 @@ export async function recoverMailbox(input: RecoverMailboxInput): Promise<{
   mailbox.accessTokenHash = hashWithPepper(newAccessToken);
   mailbox.lastLoginAt = Date.now();
 
+  const ttl = remainingTtlSeconds(mailbox);
   const pipeline = redis.pipeline();
   pipeline.set(keys.mailbox(usernameLower), JSON.stringify(mailbox), {
-    ex: SEVEN_DAYS_SECONDS,
+    ex: ttl,
   });
-  pipeline.expire(keys.mailboxLetters(usernameLower), SEVEN_DAYS_SECONDS);
-  pipeline.expire(keys.mailboxRecovery(usernameLower), SEVEN_DAYS_SECONDS);
-  pipeline.expire(keys.mailboxUnread(usernameLower), SEVEN_DAYS_SECONDS);
-  pipeline.expire(keys.mailboxReservation(usernameLower), SEVEN_DAYS_SECONDS);
-  pipeline.zadd("mb:active", { score: mailbox.lastLoginAt, member: usernameLower });
+  pipeline.zadd(keys.activeIndex(), { score: mailbox.lastLoginAt, member: usernameLower });
   await pipeline.exec();
 
   return {
@@ -167,7 +172,6 @@ export async function getPublicMailbox(username: string): Promise<{
   username: string;
   exists: boolean;
   acceptsBottles: boolean;
-  expiresAt: number;
 }> {
   const redis = getRedis();
   const usernameLower = username.toLowerCase();
@@ -179,15 +183,9 @@ export async function getPublicMailbox(username: string): Promise<{
 
   const mailbox: MailboxRecord = typeof raw === "string" ? JSON.parse(raw) : raw;
 
-  // 7-day inactivity purge guard (§2.B)
-  const lastActive = mailbox.lastLoginAt ?? mailbox.createdAt;
-  if (Date.now() - lastActive > SEVEN_DAYS_MS) {
-    await purgeInactiveMailbox(usernameLower);
-    throw new ApiError("GONE", "errors.mailboxExpired", 410);
-  }
-
   if (Date.now() > mailbox.expiresAt) {
-    throw new ApiError("GONE", "errors.mailboxExpired", 410);
+    // Collapse 410 into 404 on public route so expired and never-existed are indistinguishable (§API-05)
+    throw new ApiError("NOT_FOUND", "errors.mailboxNotFound", 404);
   }
 
   return {
@@ -195,13 +193,11 @@ export async function getPublicMailbox(username: string): Promise<{
     username: mailbox.username,
     exists: true,
     acceptsBottles: mailbox.acceptsBottles,
-    expiresAt: mailbox.expiresAt,
   };
 }
 
 /**
- * Lazy Deletion on Access / Lookup (§2.B)
- * Retrieves mailbox or purges it if 7 consecutive days of inactivity have passed.
+ * Retrieves mailbox record or null if missing or expired
  */
 export async function getMailbox(username: string): Promise<MailboxRecord | null> {
   const redis = getRedis();
@@ -212,33 +208,37 @@ export async function getMailbox(username: string): Promise<MailboxRecord | null
 
   const mailbox: MailboxRecord = typeof raw === "string" ? JSON.parse(raw) : raw;
 
-  const lastActive = mailbox.lastLoginAt ?? mailbox.createdAt;
-  if (Date.now() - lastActive > SEVEN_DAYS_MS) {
-    await purgeInactiveMailbox(usernameLower);
+  if (Date.now() > mailbox.expiresAt) {
     return null;
   }
 
   return mailbox;
 }
 
+export const GRACE_MS = (7 * 86400 + TTL_GRACE_S) * 1000;
+
 /**
- * Cascade Purge Helper (§2.C)
  * Permanently wipes a user's entire mailbox and all associated data from Redis.
  */
 export async function purgeInactiveMailbox(username: string): Promise<void> {
   const redis = getRedis();
   const usernameLower = username.toLowerCase();
 
-  // 1. Fetch and delete all associated letters
+  // 1. Fetch and delete all associated letters (chunked in batches of 50 per §PERF-01)
   const letterIds = await redis.zrange(keys.mailboxLetters(usernameLower), 0, -1);
-
-  const pipeline = redis.pipeline();
-  for (const letterId of letterIds) {
-    pipeline.del(keys.letter(letterId));
-    pipeline.del(keys.letterReactions(letterId));
+  const CHUNK_SIZE = 50;
+  for (let i = 0; i < letterIds.length; i += CHUNK_SIZE) {
+    const chunk = letterIds.slice(i, i + CHUNK_SIZE);
+    const chunkPipe = redis.pipeline();
+    for (const letterId of chunk) {
+      chunkPipe.del(keys.letter(letterId));
+      chunkPipe.del(keys.letterReactions(letterId));
+    }
+    await chunkPipe.exec();
   }
 
   // 2. Delete mailbox record, letters index, recovery passcode, and unread counter
+  const pipeline = redis.pipeline();
   pipeline.del(keys.mailboxLetters(usernameLower));
   pipeline.del(keys.mailbox(usernameLower));
   pipeline.del(keys.mailboxRecovery(usernameLower));
@@ -252,77 +252,49 @@ export async function purgeInactiveMailbox(username: string): Promise<void> {
   pipeline.zrem(keys.bottlePool("male"), usernameLower);
   pipeline.zrem(keys.bottlePool("female"), usernameLower);
   pipeline.zrem(keys.bottlePool("other"), usernameLower);
-  pipeline.zrem("mb:active", usernameLower);
+  pipeline.zrem(keys.activeIndex(), usernameLower);
 
   await pipeline.exec();
 }
 
 /**
- * Refreshes lastLoginAt and extends 7-day TTL on key Redis structures (§1, §2.A)
+ * Updates active index for observability with a 5-minute throttle (§PERF-02).
  */
-export async function touchMailboxLogin(username: string): Promise<void> {
-  const redis = getRedis();
-  const usernameLower = username.toLowerCase();
-
-  const raw = await redis.get<string | MailboxRecord>(keys.mailbox(usernameLower));
-  if (!raw) return;
-
-  const mailbox: MailboxRecord = typeof raw === "string" ? JSON.parse(raw) : raw;
+export async function touchMailboxLogin(mailbox: MailboxRecord): Promise<void> {
   const now = Date.now();
-  mailbox.lastLoginAt = now;
+  // Throttle: skip the write when last activity was less than 5 minutes ago (§PERF-02)
+  if (mailbox.lastLoginAt && now - mailbox.lastLoginAt < 5 * 60_000) {
+    return;
+  }
 
-  const pipeline = redis.pipeline();
-  pipeline.set(keys.mailbox(usernameLower), JSON.stringify(mailbox), {
-    ex: SEVEN_DAYS_SECONDS,
-  });
-  pipeline.expire(keys.mailboxLetters(usernameLower), SEVEN_DAYS_SECONDS);
-  pipeline.expire(keys.mailboxRecovery(usernameLower), SEVEN_DAYS_SECONDS);
-  pipeline.expire(keys.mailboxUnread(usernameLower), SEVEN_DAYS_SECONDS);
-  pipeline.expire(keys.mailboxReservation(usernameLower), SEVEN_DAYS_SECONDS);
-  pipeline.zadd("mb:active", { score: now, member: usernameLower });
-
-  await pipeline.exec();
+  const redis = getRedis();
+  await redis.zadd(keys.activeIndex(), { score: now, member: mailbox.usernameLower });
 }
 
 /**
- * Scans active mailboxes and cascades purge on any with >7 days of inactivity (§3)
+ * Scans active index using range query on sorted set (§PERF-01).
+ * Capped at 200 mailboxes per invocation.
  */
 export async function cleanupInactiveMailboxes(): Promise<number> {
   const redis = getRedis();
-  let purgedCount = 0;
-  const now = Date.now();
+  const cutoff = Date.now() - GRACE_MS;
+  const stale = await redis.zrange(keys.activeIndex(), 0, cutoff, {
+    byScore: true,
+    offset: 0,
+    count: 200,
+  });
 
-  const mbKeys = await redis.keys("mb:*");
-  const processedUsernames = new Set<string>();
+  if (!stale || stale.length === 0) {
+    return 0;
+  }
 
-  for (const key of mbKeys) {
-    if (
-      key.startsWith("mb:name:") ||
-      key.startsWith("mb:recover:") ||
-      key.startsWith("mb:ltrs:") ||
-      key.startsWith("mb:unread:") ||
-      key.startsWith("mb:active")
-    ) {
-      continue;
-    }
-
-    const usernameLower = key.replace(/^mb:/, "").trim();
-    if (!usernameLower || processedUsernames.has(usernameLower)) continue;
-    processedUsernames.add(usernameLower);
-
-    const raw = await redis.get<string | MailboxRecord>(key);
-    if (!raw) continue;
-
-    const mailbox: MailboxRecord = typeof raw === "string" ? JSON.parse(raw) : raw;
-    const lastActive = mailbox.lastLoginAt ?? mailbox.createdAt;
-
-    if (now - lastActive > SEVEN_DAYS_MS) {
-      await purgeInactiveMailbox(usernameLower);
-      purgedCount++;
+  for (const u of stale) {
+    if (u) {
+      await purgeInactiveMailbox(u);
     }
   }
 
-  return purgedCount;
+  return stale.length;
 }
 
 export async function updateMailboxSettings(
@@ -334,10 +306,7 @@ export async function updateMailboxSettings(
 
   mailbox.acceptsBottles = input.acceptsBottles;
 
-  const remainingSeconds = Math.max(
-    1,
-    Math.floor((mailbox.expiresAt - Date.now()) / 1000)
-  );
+  const remainingSeconds = remainingTtlSeconds(mailbox);
 
   const pipeline = redis.pipeline();
   pipeline.set(keys.mailbox(usernameLower), JSON.stringify(mailbox), {

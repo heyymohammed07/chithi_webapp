@@ -1,15 +1,21 @@
 import sanitizeHtml from "sanitize-html";
 import { LETTER_BODY_MAX } from "./constants";
+import { ApiError } from "./api";
+
+// Matches explicit schemes (http, https, ftp), protocol-relative (//), and www. hosts
+const SCHEME_REGEX = /(?:https?:\/\/|ftp:\/\/|\/\/)[^\s]+|\bwww\.[a-zA-Z0-9-]+\.[^\s]+/gi;
+
+// Matches bare domains with at least 2 labels, a curated TLD, and mandatory path/query/port
+const BARE_DOMAIN_REGEX =
+  /(^|[\s(\[{<])((?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|co|me|xyz|app|dev|link|info|live|site)(?:[:/?#][^\s]*))/gi;
 
 /**
- * Strips URLs and replaces them with [link removed] token.
+ * Strips URLs and replaces them with link removed placeholder (§COR-05).
  */
-export function stripUrls(text: string): string {
-  // Matches https?://..., ftp://..., www...., and common tld patterns like domain.com/path
-  const urlRegex =
-    /(?:https?:\/\/|ftp:\/\/|www\.)[^\s/$.?#].[^\s]*|(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|co|me|xyz|app|dev|link|info|live|site)(?:\/[^\s]*)?/gi;
-
-  return text.replace(urlRegex, "[link removed]");
+export function stripUrls(text: string, placeholder = "[link removed]"): string {
+  let res = text.replace(SCHEME_REGEX, placeholder);
+  res = res.replace(BARE_DOMAIN_REGEX, (_match, prefix) => prefix + placeholder);
+  return res;
 }
 
 /**
@@ -21,18 +27,47 @@ export function hasExcessivelyLongWord(text: string, maxWordLen = 60): boolean {
 }
 
 /**
- * Cleans, sanitizes, and normalises user input to pure plain text.
+ * Truncates text on a grapheme cluster boundary without splitting
+ * composite characters, surrogate pairs, or Bengali conjuncts.
+ */
+export function truncateGraphemes(text: string, maxGraphemes: number): string {
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    const segments = Array.from(segmenter.segment(text));
+    if (segments.length <= maxGraphemes) return text;
+    return segments.slice(0, maxGraphemes).map((s) => s.segment).join("");
+  }
+  return text.slice(0, maxGraphemes);
+}
+
+/**
+ * Counts grapheme clusters (aware of Bengali conjuncts and composite characters)
+ */
+export function countGraphemes(text: string): number {
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    return Array.from(segmenter.segment(text)).length;
+  }
+  return text.length;
+}
+
+/**
+ * Cleans, sanitizes, and normalises user input to pure plain text (§COR-04, §COR-05).
  * Strictly preserves Bengali ZWNJ (\u200C) and ZWJ (\u200D) while removing
  * zero-width, bidi overrides, control characters, and all HTML tags.
  */
-export function toPlainText(input: string, maxChars = LETTER_BODY_MAX): string {
+export function toPlainText(
+  input: string,
+  maxChars = LETTER_BODY_MAX,
+  placeholder = "[link removed]"
+): string {
   if (typeof input !== "string") {
-    throw new Error("Input must be a string");
+    throw new ApiError("VALIDATION_FAILED", "errors.validation.inputMustBeString", 400);
   }
 
-  // Pre-screen enormous inputs to prevent ReDoS
+  // Pre-screen enormous inputs to prevent ReDoS (§COR-04)
   if (input.length > maxChars * 5) {
-    throw new Error("Input payload too large");
+    throw new ApiError("VALIDATION_FAILED", "errors.validation.payloadTooLarge", 400);
   }
 
   // 1. Unicode normalise NFC
@@ -54,8 +89,8 @@ export function toPlainText(input: string, maxChars = LETTER_BODY_MAX): string {
     disallowedTagsMode: "discard",
   });
 
-  // 5. Strip URLs from letter bodies/hints per §10.3
-  cleaned = stripUrls(cleaned);
+  // 5. Strip URLs from letter bodies/hints per §COR-05
+  cleaned = stripUrls(cleaned, placeholder);
 
   // 6. Format whitespace: trim line endings, collapse >2 newlines to 2, trim ends
   cleaned = cleaned
@@ -65,21 +100,26 @@ export function toPlainText(input: string, maxChars = LETTER_BODY_MAX): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  // 7. Enforce length cap AFTER sanitization
-  if (cleaned.length > maxChars) {
-    throw new Error(`Text exceeds maximum allowed length of ${maxChars} characters`);
+  // 7. Enforce length cap AFTER sanitization (§COR-05)
+  // Truncate on grapheme boundary if post-strip length exceeds maxChars
+  if (countGraphemes(cleaned) > maxChars) {
+    cleaned = truncateGraphemes(cleaned, maxChars);
   }
 
   return cleaned;
 }
 
 /**
- * Counts grapheme clusters (aware of Bengali conjuncts and composite characters)
+ * Sanitizes sender names specifically: flattens and strips all newlines (\r, \n),
+ * tabs, bidi override markers, and HTML tags (§COR-06).
  */
-export function countGraphemes(text: string): number {
-  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
-    const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-    return Array.from(segmenter.segment(text)).length;
+export function sanitizeSenderName(name: string, maxChars = 40): string {
+  if (typeof name !== "string") return "";
+  let cleaned = toPlainText(name, maxChars);
+  cleaned = cleaned.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+  if (countGraphemes(cleaned) > maxChars) {
+    cleaned = truncateGraphemes(cleaned, maxChars);
   }
-  return text.length;
+  return cleaned;
 }
+

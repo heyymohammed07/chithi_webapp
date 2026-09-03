@@ -17,7 +17,7 @@ export function StampPicker({ selected, onChange }: StampPickerProps) {
 
   return (
     <div className="space-y-2.5">
-      <label className="block text-xs font-mono uppercase tracking-wider text-[#7A6658] dark:text-[#C5B3A6]">
+      <label className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
         {t("composer.stampLabel")}
       </label>
 
@@ -37,19 +37,19 @@ export function StampPicker({ selected, onChange }: StampPickerProps) {
               role="radio"
               aria-checked={isSelected}
               onClick={() => onChange(key)}
-              className={`group flex flex-col items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E27D50] focus-visible:outline-offset-2 rounded-xl p-1 transition-all ${
+              className={`group flex flex-col items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-wax focus-visible:outline-offset-2 rounded-xl p-1 transition-all ${
                 isSelected ? "scale-105" : "opacity-85 hover:opacity-100"
               }`}
             >
               <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-sm ${
                   isSelected
-                    ? "border-2 border-[#E27D50] ring-2 ring-[#E27D50]/20 bg-[#FFE5B4]/40 dark:bg-[#2B143D]"
-                    : "border border-[#E5D5C2] dark:border-[#3E2356] bg-white/80 dark:bg-[#1A0C28]/80 text-[#4A3B32] dark:text-[#D5C2B6] hover:border-[#E27D50]/60"
+                    ? "border-2 border-wax ring-2 ring-wax/20 bg-peach/40 dark:bg-surface-raised"
+                    : "border border-edge bg-surface/80 text-ink hover:border-wax/60"
                 }`}
               >
                 {key === "wax" && (
-                  <div className="w-6 h-6 rounded-full bg-[#E88B60] text-white font-serif italic text-xs font-bold flex items-center justify-center shadow-sm">
+                  <div className="w-6 h-6 rounded-full bg-wax text-white font-serif italic text-xs font-bold flex items-center justify-center shadow-sm">
                     C
                   </div>
                 )}
@@ -62,22 +62,22 @@ export function StampPicker({ selected, onChange }: StampPickerProps) {
                   <Clock
                     size={18}
                     strokeWidth={1.5}
-                    className={isSelected ? "text-[#E88B60]" : "text-[#4A3B32] dark:text-[#D5C2B6]"}
+                    className={isSelected ? "text-wax" : "text-ink-muted"}
                   />
                 )}
                 {key === "heartbreak" && (
                   <HeartCrack
                     size={18}
                     strokeWidth={1.5}
-                    className={isSelected ? "text-[#E88B60]" : "text-[#4A3B32] dark:text-[#D5C2B6]"}
+                    className={isSelected ? "text-wax" : "text-ink-muted"}
                   />
                 )}
               </div>
               <span
                 className={`text-[11px] whitespace-nowrap transition-colors ${
                   isSelected
-                    ? "text-[#2C1E16] dark:text-[#FFF8F0] font-semibold"
-                    : "text-[#7A6658] dark:text-[#C5B3A6] font-medium"
+                    ? "text-ink dark:text-ink-heading font-semibold"
+                    : "text-ink-muted font-medium"
                 }`}
               >
                 {t(s.labelKey)}

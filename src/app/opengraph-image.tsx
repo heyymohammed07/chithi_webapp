@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { THEME_COLORS } from "@/lib/theme";
 
 export const runtime = "nodejs";
 export const alt = "Chithi · চিঠি — Anonymous Ephemeral Letters";
@@ -13,7 +14,7 @@ export default async function Image() {
     (
       <div
         style={{
-          background: "#0F0E11",
+          background: THEME_COLORS.canvas.dark,
           width: "100%",
           height: "100%",
           display: "flex",
@@ -21,7 +22,7 @@ export default async function Image() {
           alignItems: "center",
           justifyContent: "center",
           padding: "80px",
-          border: "2px solid #26242B",
+          border: `2px solid ${THEME_COLORS.edge.dark}`,
         }}
       >
         <div
@@ -37,7 +38,7 @@ export default async function Image() {
               fontSize: 96,
               fontFamily: "serif",
               fontWeight: 700,
-              color: "#F0EDE6",
+              color: THEME_COLORS.inkHeading.dark,
             }}
           >
             Chithi
@@ -46,7 +47,7 @@ export default async function Image() {
             style={{
               fontSize: 64,
               fontFamily: "serif",
-              color: "#D4A373",
+              color: THEME_COLORS.wax.dark,
             }}
           >
             চিঠি
@@ -56,7 +57,7 @@ export default async function Image() {
         <div
           style={{
             fontSize: 28,
-            color: "#8E8B94",
+            color: THEME_COLORS.inkMuted.dark,
             textAlign: "center",
             maxWidth: "800px",
             lineHeight: 1.5,
@@ -69,10 +70,10 @@ export default async function Image() {
           style={{
             marginTop: "48px",
             padding: "8px 24px",
-            border: "1px solid #D4A373",
+            border: `1px solid ${THEME_COLORS.wax.dark}`,
             borderRadius: "4px",
             fontSize: 20,
-            color: "#D4A373",
+            color: THEME_COLORS.wax.dark,
             fontFamily: "monospace",
             textTransform: "uppercase",
             letterSpacing: "0.1em",

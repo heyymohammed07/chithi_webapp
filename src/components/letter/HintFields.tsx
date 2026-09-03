@@ -40,10 +40,10 @@ export function HintFields({ hints, onChange }: HintFieldsProps) {
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-xs font-mono uppercase tracking-wider text-[#7A6658] dark:text-[#C5B3A6]">
+        <label className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
           {t("composer.hintsHeading")}
         </label>
-        <p className="text-xs text-[#7A6658] dark:text-[#C5B3A6] mt-0.5">
+        <p className="text-xs text-ink-muted mt-0.5">
           {t("composer.hintsHelp")}
         </p>
       </div>
@@ -76,7 +76,7 @@ export function HintFields({ hints, onChange }: HintFieldsProps) {
         <button
           type="button"
           onClick={handleAdd}
-          className="inline-flex items-center gap-1.5 text-xs text-[#E88B60] hover:text-[#D67448] dark:hover:text-[#FFF8F0] transition-colors font-medium py-1"
+          className="inline-flex items-center gap-1.5 text-xs text-wax hover:text-wax/80 dark:hover:text-ink-heading transition-colors font-medium py-1"
         >
           <Plus size={14} strokeWidth={1.25} />
           <span>{t("composer.addHint")}</span>

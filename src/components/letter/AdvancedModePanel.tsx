@@ -52,9 +52,11 @@ export function AdvancedModePanel({
   let capsuleEcho = "";
   if (state.lockKind === "capsule" && state.unlockAt > now) {
     try {
+      const dateLocales = { bn, en: enUS };
+      const dateLocale = dateLocales[locale as keyof typeof dateLocales] || enUS;
       const distance = formatDistanceToNow(new Date(state.unlockAt), {
         addSuffix: true,
-        locale: locale === "bn" ? bn : enUS,
+        locale: dateLocale,
       });
       capsuleEcho = `${t("composer.lockCapsuleEcho")} ${distance}`;
     } catch {
@@ -63,25 +65,25 @@ export function AdvancedModePanel({
   }
 
   return (
-    <div className="border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] overflow-hidden shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)]">
+    <div className="border border-edge rounded-3xl bg-surface overflow-hidden shadow-[0_12px_32px_-8px_rgba(70,48,32,0.08)]">
       {/* Accordion trigger */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-5 py-4 flex items-center justify-between text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E88B60] focus-visible:outline-offset-2 min-h-[44px]"
+        className="w-full px-5 py-4 flex items-center justify-between text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-wax focus-visible:outline-offset-2 min-h-[44px]"
       >
         <div className="flex items-center gap-2.5">
-          <Lock size={18} strokeWidth={1.5} className="text-[#E88B60]" />
+          <Lock size={18} strokeWidth={1.5} className="text-wax" />
           <div>
-            <h4 className="text-sm font-semibold text-[#2C1E16] dark:text-[#FFF8F0]">
+            <h4 className="text-sm font-semibold text-ink dark:text-ink-heading">
               {t("composer.advancedTitle")}
             </h4>
-            <p className="text-xs text-[#7A6658] dark:text-[#C5B3A6]">
+            <p className="text-xs text-ink-muted">
               {t("composer.advancedSubtitle")}
             </p>
           </div>
         </div>
-        <div className="text-[#7A6658] dark:text-[#C5B3A6]">
+        <div className="text-ink-muted">
           {isOpen ? (
             <ChevronUp size={18} strokeWidth={1.5} />
           ) : (
@@ -91,24 +93,24 @@ export function AdvancedModePanel({
       </button>
 
       {isOpen && (
-        <div className="px-5 pb-5 pt-2 border-t border-[#F0E2D2] dark:border-[#351D4D] space-y-6">
+        <div className="px-5 pb-5 pt-2 border-t border-edge space-y-6">
           {/* Radio Choice: Lock Modes (Mutually Exclusive per §11.3) */}
           <div className="space-y-3">
-            <label className="block text-xs font-mono uppercase tracking-wider text-[#7A6658] dark:text-[#C5B3A6]">
-              Lock Type
+            <label className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
+              {t("composer.lockType")}
             </label>
 
             {/* Option 1: None */}
-            <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-[#F0E2D2] dark:hover:border-[#351D4D] transition-colors">
+            <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-edge transition-colors">
               <input
                 type="radio"
                 name="lockMode"
                 checked={state.lockKind === "none"}
                 onChange={() => onChange({ ...state, lockKind: "none" })}
-                className="mt-0.5 text-[#E88B60] focus:ring-[#E88B60]"
+                className="mt-0.5 text-wax focus:ring-wax"
               />
               <div>
-                <span className="text-sm text-[#2C1E16] dark:text-[#FFF8F0] font-medium">
+                <span className="text-sm text-ink dark:text-ink-heading font-medium">
                   {t("composer.lockNone")}
                 </span>
               </div>
@@ -116,7 +118,7 @@ export function AdvancedModePanel({
 
             {/* Option 2: Capsule */}
             {canCapsule && (
-              <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-[#F0E2D2] dark:hover:border-[#351D4D] transition-colors">
+              <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-edge transition-colors">
                 <input
                   type="radio"
                   name="lockMode"
@@ -129,13 +131,13 @@ export function AdvancedModePanel({
                       unlockAt: defaultUnlock,
                     });
                   }}
-                  className="mt-0.5 text-[#E88B60] focus:ring-[#E88B60]"
+                  className="mt-0.5 text-wax focus:ring-wax"
                 />
                 <div className="flex-1">
-                  <span className="text-sm text-[#2C1E16] dark:text-[#FFF8F0] font-medium">
+                  <span className="text-sm text-ink dark:text-ink-heading font-medium">
                     {t("composer.lockCapsule")}
                   </span>
-                  <p className="text-xs text-[#7A6658] dark:text-[#C5B3A6] mt-0.5">
+                  <p className="text-xs text-ink-muted mt-0.5">
                     {t("composer.lockCapsuleDesc")}
                   </p>
 
@@ -151,10 +153,10 @@ export function AdvancedModePanel({
                             : ""
                         }
                         onChange={(e) => handleCapsuleChange(e.target.value)}
-                        className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-[#FFFDF9] dark:bg-[#12061C] text-[#2C1E16] dark:text-[#FFF8F0] rounded-xl border border-[#F0E2D2] dark:border-[#351D4D] focus:outline-none focus:border-[#E88B60]"
+                        className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-canvas dark:bg-surface-raised text-ink dark:text-ink-heading rounded-xl border border-edge focus:outline-none focus:border-wax"
                       />
                       {capsuleEcho && (
-                        <p className="text-xs text-[#E88B60] font-serif italic">
+                        <p className="text-xs text-wax font-serif italic">
                           {capsuleEcho}
                         </p>
                       )}
@@ -165,26 +167,26 @@ export function AdvancedModePanel({
             )}
 
             {/* Option 3: Riddle */}
-            <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-[#F0E2D2] dark:hover:border-[#351D4D] transition-colors">
+            <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-edge transition-colors">
               <input
                 type="radio"
                 name="lockMode"
                 checked={state.lockKind === "riddle"}
                 onChange={() => onChange({ ...state, lockKind: "riddle" })}
-                className="mt-0.5 text-[#E88B60] focus:ring-[#E88B60]"
+                className="mt-0.5 text-wax focus:ring-wax"
               />
               <div className="flex-1">
-                <span className="text-sm text-[#2C1E16] dark:text-[#FFF8F0] font-medium">
+                <span className="text-sm text-ink dark:text-ink-heading font-medium">
                   {t("composer.lockRiddle")}
                 </span>
-                <p className="text-xs text-[#7A6658] dark:text-[#C5B3A6] mt-0.5">
+                <p className="text-xs text-ink-muted mt-0.5">
                   {t("composer.lockRiddleDesc")}
                 </p>
 
                 {state.lockKind === "riddle" && (
                   <div className="mt-3 space-y-3">
                     <div>
-                      <label className="block text-xs text-[#7A6658] dark:text-[#C5B3A6] mb-1">
+                      <label className="block text-xs text-ink-muted mb-1">
                         {t("composer.riddleQuestionLabel")}
                       </label>
                       <Input
@@ -198,7 +200,7 @@ export function AdvancedModePanel({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-[#7A6658] dark:text-[#C5B3A6] mb-1">
+                      <label className="block text-xs text-ink-muted mb-1">
                         {t("composer.riddleAnswerLabel")}
                       </label>
                       <Input
@@ -210,7 +212,7 @@ export function AdvancedModePanel({
                         placeholder={t("composer.riddleAnswerPlaceholder")}
                         className="text-xs"
                       />
-                      <p className="text-[11px] text-[#857367] dark:text-[#A592A4] mt-1">
+                      <p className="text-[11px] text-ink-muted mt-1">
                         {t("composer.riddleAnswerHelp")}
                       </p>
                     </div>
@@ -220,14 +222,14 @@ export function AdvancedModePanel({
             </label>
           </div>
 
-          <div className="h-px bg-[#F0E2D2] dark:bg-[#351D4D]" />
+          <div className="h-px bg-edge" />
 
           {/* Burn After Reading Toggle (Independent switch per §11.3) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Flame size={16} strokeWidth={1.5} className="text-[#E27D50]" />
-                <span className="text-sm font-semibold text-[#2C1E16] dark:text-[#FFF8F0]">
+                <Flame size={16} strokeWidth={1.5} className="text-wax" />
+                <span className="text-sm font-semibold text-ink dark:text-ink-heading">
                   {t("composer.burnLabel")}
                 </span>
               </div>
@@ -238,11 +240,11 @@ export function AdvancedModePanel({
                 }
               />
             </div>
-            <p className="text-xs text-[#7A6658] dark:text-[#C5B3A6]">
+            <p className="text-xs text-ink-muted">
               {t("composer.burnDesc")}
             </p>
             {state.burnAfterReading && (
-              <p className="text-[11px] text-[#D9534F] dark:text-[#F87171] font-serif italic">
+              <p className="text-[11px] text-wax font-serif italic">
                 {t("composer.burnPublishNotice")}
               </p>
             )}

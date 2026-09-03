@@ -1,22 +1,33 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { cookies } from "next/headers";
 import { fontVariables } from "./fonts";
 import "./globals.css";
 import { LocaleProvider } from "@/i18n/provider";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { SessionProvider } from "@/context/SessionContext";
 import { GrainOverlay } from "@/components/layout/GrainOverlay";
+import { env } from "@/lib/env";
+import { Locale } from "@/i18n/types";
+
+import { THEME_COLORS } from "@/lib/theme";
 
 export const viewport: Viewport = {
-  themeColor: "#FFFDF9",
+  themeColor: THEME_COLORS.canvas.light,
   width: "device-width",
   initialScale: 1,
 };
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || env.NEXT_PUBLIC_APP_URL;
+
 export const metadata: Metadata = {
+  metadataBase: new URL(appUrl),
   title: "Chithi — চিঠি",
   description: "Send your letter to loved ones.",
-  metadataBase: new URL("http://localhost:3000"),
+  alternates: {
+    canonical: "/",
+  },
   icons: {
     icon: "/logo.png",
     shortcut: "/logo.png",
@@ -26,17 +37,22 @@ export const metadata: Metadata = {
     title: "Chithi — চিঠি",
     description: "Send your letter to loved ones.",
     type: "website",
+    url: "/",
     images: ["/logo.png"],
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const rawLocale = cookieStore.get("chithi_locale")?.value;
+  const initialLocale: Locale = rawLocale === "bn" ? "bn" : "en";
+
   return (
-    <html lang="en" className={fontVariables} suppressHydrationWarning>
+    <html lang={initialLocale} className={fontVariables} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -44,11 +60,13 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-[#FFFDF9] dark:bg-[#0C0314] text-[#382A22] dark:text-[#F5EBE6] antialiased min-h-screen relative selection:bg-[#FFE5B4] selection:text-[#382A22] transition-colors duration-200">
+      <body className="bg-canvas text-ink antialiased min-h-screen relative selection:bg-peach selection:text-ink transition-colors duration-200">
         <ThemeProvider>
-          <LocaleProvider>
-            <GrainOverlay />
-            {children}
+          <LocaleProvider initialLocale={initialLocale}>
+            <SessionProvider>
+              <GrainOverlay />
+              {children}
+            </SessionProvider>
           </LocaleProvider>
         </ThemeProvider>
         <Analytics />

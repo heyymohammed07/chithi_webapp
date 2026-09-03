@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { ReactFeedSchema } from "@/lib/schemas";
 import { reactToFeedItem } from "@/lib/feed";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { apiOk, apiErr, ApiError, getViewerHash, parseJsonBody } from "@/lib/api";
+import { apiOk, apiErr, ApiError, getRateKey, getViewerHash, parseJsonBody, rateLimitHeaders } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,24 +13,13 @@ export async function POST(
 ) {
   try {
     const { id } = await props.params;
+    const rateKey = getRateKey(req);
     const viewerHash = getViewerHash(req);
 
-    // Rate limit: 30 reacts / min per viewer hash (§10.1)
-    const rl = await checkRateLimit("react", viewerHash);
+    // Rate limit: 30 reacts / min per IP (§10.1)
+    const rl = await checkRateLimit("react", rateKey);
     if (!rl.success) {
-      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
-      return apiErr(
-        "RATE_LIMITED",
-        "errors.rateLimited",
-        429,
-        undefined,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(rl.limit),
-          "X-RateLimit-Remaining": String(rl.remaining),
-          "X-RateLimit-Reset": String(rl.reset),
-        }
-      );
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rl));
     }
 
     const input = await parseJsonBody(req, ReactFeedSchema);

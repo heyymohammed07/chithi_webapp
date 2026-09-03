@@ -2,31 +2,19 @@ import { NextRequest } from "next/server";
 import { ReportSchema } from "@/lib/schemas";
 import { reportContent } from "@/lib/feed";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { apiOk, apiErr, ApiError, getViewerHash, parseJsonBody } from "@/lib/api";
+import { apiOk, apiErr, ApiError, getRateKey, parseJsonBody, rateLimitHeaders } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const viewerHash = getViewerHash(req);
+    const rateKey = getRateKey(req);
 
-    // Rate limit: 10 reports / hour per viewer hash (§10.1)
-    const rl = await checkRateLimit("report", viewerHash);
+    // Rate limit: 10 reports / hour per IP (§10.1)
+    const rl = await checkRateLimit("report", rateKey);
     if (!rl.success) {
-      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
-      return apiErr(
-        "RATE_LIMITED",
-        "errors.rateLimited",
-        429,
-        undefined,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(rl.limit),
-          "X-RateLimit-Remaining": String(rl.remaining),
-          "X-RateLimit-Reset": String(rl.reset),
-        }
-      );
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rl));
     }
 
     const input = await parseJsonBody(req, ReportSchema);

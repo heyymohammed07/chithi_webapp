@@ -1,20 +1,39 @@
 import { SendLetterInput } from "./schemas";
-import { LetterRecord, LetterSummary, MailboxRecord, PaperStyleId, StampId } from "./types";
+import {
+  LetterRecord,
+  LetterSummary,
+  MailboxRecord,
+  PaperStyleId,
+  StampId,
+  OpenLetter,
+  LetterView,
+} from "./types";
 import {
   CAPSULE_MIN_LEAD_MS,
   BURN_WINDOW_MS,
   MAILBOX_LETTER_CAP,
   RIDDLE_MAX_ATTEMPTS,
-  SEVEN_DAYS_MS,
+  INBOX_PAGE_SIZE,
 } from "./constants";
 import { keys } from "./keys";
 import { getRedis } from "./redis";
 import { generateLetterId } from "./ids";
-import { toPlainText, hasExcessivelyLongWord } from "./sanitize";
-import { hashRiddleAnswer, timingSafeEqual, sha256 } from "./crypto";
+import { toPlainText, hasExcessivelyLongWord, sanitizeSenderName } from "./sanitize";
+import { hashRiddleAnswer, sha256 } from "./crypto";
 import { ApiError } from "./api";
-import { purgeInactiveMailbox } from "./mailbox";
-import { publishDirectToFeed } from "./feed";
+import { getMailbox, remainingTtlSeconds } from "./mailbox";
+import {
+  OPEN_LETTER_SCRIPT,
+  SOLVE_RIDDLE_SCRIPT,
+  DELETE_LETTER_SCRIPT,
+  SET_REACTION_SCRIPT,
+} from "./scripts";
+
+async function letterTtlSeconds(letter: LetterRecord): Promise<number> {
+  const mailbox = await getMailbox(letter.recipient);
+  if (!mailbox) throw new ApiError("GONE", "errors.mailboxExpired", 410);
+  return remainingTtlSeconds(mailbox);
+}
 
 export async function sendLetter(
   input: SendLetterInput,
@@ -33,11 +52,6 @@ export async function sendLetter(
     typeof rawMailbox === "string" ? JSON.parse(rawMailbox) : rawMailbox;
 
   const now = Date.now();
-  const lastActive = mailbox.lastLoginAt ?? mailbox.createdAt;
-  if (now - lastActive > SEVEN_DAYS_MS) {
-    await purgeInactiveMailbox(recipientLower);
-    throw new ApiError("GONE", "errors.mailboxExpired", 410);
-  }
 
   if (now > mailbox.expiresAt) {
     throw new ApiError("GONE", "errors.mailboxExpired", 410);
@@ -100,8 +114,7 @@ export async function sendLetter(
     };
   }
 
-  // 6. Clamp letter TTL to mailbox lifetime
-  const remainingSeconds = Math.max(1, Math.floor((mailbox.expiresAt - now) / 1000));
+  // 6. Letter ID and record
   const letterId = generateLetterId();
 
   const letterRecord: LetterRecord = {
@@ -119,12 +132,12 @@ export async function sendLetter(
     burnAt: null,
     reaction: null,
     published: false,
-    attachedSong: input.attachedSong,
-    senderName: input.isAnonymous ? null : (input.senderName?.trim() || null),
+    senderName: input.isAnonymous ? null : (sanitizeSenderName(input.senderName ?? "", 40) || null),
     version: 1,
   };
 
-  // 7. Write in pipeline
+  const remainingSeconds = await remainingTtlSeconds(mailbox);
+
   const pipeline = redis.pipeline();
   pipeline.set(keys.letter(letterId), JSON.stringify(letterRecord), {
     ex: remainingSeconds,
@@ -135,34 +148,32 @@ export async function sendLetter(
   });
   pipeline.expire(keys.mailboxLetters(recipientLower), remainingSeconds);
   pipeline.incr(keys.mailboxUnread(recipientLower));
-  pipeline.set(floodKey, bodyHash, { ex: 600 }); // 10m flood guard
+  pipeline.set(floodKey, bodyHash, { ex: 600 });
   await pipeline.exec();
-
-  // If user opted into Benami Kham (Public Wall), publish feed item
-  if (input.isPublic) {
-    try {
-      await publishDirectToFeed(cleanBody, input.paper as PaperStyleId, input.stamp as StampId);
-    } catch (err) {
-      console.warn("[sendLetter] Failed to publish public feed item", err);
-    }
-  }
 
   return { id: letterId };
 }
 
-export async function listLetters(usernameLower: string): Promise<LetterSummary[]> {
+export async function listLetters(
+  usernameLower: string,
+  cursor: number = 0
+): Promise<{ items: LetterSummary[]; nextCursor: number | null }> {
   const redis = getRedis();
 
-  // 1. Read all letter IDs in reverse chronological order
-  const letterIds: string[] =
-    typeof redis.zrange === "function"
-      ? await redis.zrange(keys.mailboxLetters(usernameLower), 0, -1, { rev: true })
-      : await redis.zrevrange(keys.mailboxLetters(usernameLower), 0, -1);
+  const start = Math.max(0, cursor);
+  const stop = start + INBOX_PAGE_SIZE - 1;
+
+  const letterIds: string[] = await redis.zrange(
+    keys.mailboxLetters(usernameLower),
+    start,
+    stop,
+    { rev: true }
+  );
+
   if (!letterIds || letterIds.length === 0) {
-    return [];
+    return { items: [], nextCursor: null };
   }
 
-  // 2. MGET letter bodies
   const letterKeys = letterIds.map((id) => keys.letter(id));
   const rawLetters = await redis.mget<unknown[]>(...letterKeys);
 
@@ -187,7 +198,6 @@ export async function listLetters(usernameLower: string): Promise<LetterSummary[
       continue;
     }
 
-    // Check if letter burned out mid-session
     if (letter.burnAt !== null && now > letter.burnAt) {
       ghostIds.push(id);
       continue;
@@ -203,17 +213,21 @@ export async function listLetters(usernameLower: string): Promise<LetterSummary[
       hintCount: letter.hints.length,
       lockKind: letter.lock.kind,
       unlockAt: letter.lock.kind === "capsule" ? letter.lock.unlockAt : undefined,
+      question: letter.lock.kind === "riddle" ? letter.lock.question : undefined,
+      attemptsRemaining:
+        letter.lock.kind === "riddle"
+          ? Math.max(0, RIDDLE_MAX_ATTEMPTS - letter.lock.attempts)
+          : undefined,
       isOpened: letter.openedAt !== null,
       burnAt: letter.burnAt,
       burnAfterReading: letter.burnAfterReading,
       reaction: letter.reaction,
       published: letter.published,
-      attachedSong: letter.attachedSong,
       senderName: letter.senderName,
     });
   }
 
-  // 3. Prune ghost members in background
+  // Ghost-prune on the fetched slice only (§PERF-04)
   if (ghostIds.length > 0) {
     const pipeline = redis.pipeline();
     pipeline.zrem(keys.mailboxLetters(usernameLower), ...ghostIds);
@@ -223,13 +237,25 @@ export async function listLetters(usernameLower: string): Promise<LetterSummary[
     pipeline.exec().catch((err) => console.error("Ghost pruning error:", err));
   }
 
-  return summaries;
+  const nextCursor = letterIds.length === INBOX_PAGE_SIZE ? start + INBOX_PAGE_SIZE : null;
+
+  // Self-healing: if on first page and all letters fit, unread counter can be safely reconciled
+  if (start === 0 && nextCursor === null) {
+    const trueUnreadCount = summaries.filter((s) => !s.isOpened).length;
+    const mailbox = await getMailbox(usernameLower);
+    if (mailbox) {
+      const ttl = remainingTtlSeconds(mailbox);
+      await redis.set(keys.mailboxUnread(usernameLower), trueUnreadCount, { ex: ttl });
+    }
+  }
+
+  return { items: summaries, nextCursor };
 }
 
 export async function getLetter(
   usernameLower: string,
   letterId: string
-): Promise<Omit<LetterRecord, "lock"> & { lock: LetterRecord["lock"] extends { answerHash: string } ? Omit<LetterRecord["lock"], "answerHash"> : LetterRecord["lock"] }> {
+): Promise<LetterView> {
   const redis = getRedis();
   const raw = await redis.get<string | LetterRecord>(keys.letter(letterId));
 
@@ -245,63 +271,84 @@ export async function getLetter(
 
   const now = Date.now();
 
-  // Burn check
   if (letter.burnAt !== null && now > letter.burnAt) {
     await redis.del(keys.letter(letterId));
     await redis.zrem(keys.mailboxLetters(usernameLower), letterId);
     throw new ApiError("GONE", "errors.letterBurned", 410);
   }
 
-  // Capsule lock check
+  const baseSummary: LetterSummary = {
+    id: letter.id,
+    stamp: letter.stamp,
+    paper: letter.paper,
+    createdAt: letter.createdAt,
+    source: letter.source,
+    hasHints: letter.hints.length > 0,
+    hintCount: letter.hints.length,
+    lockKind: letter.lock.kind,
+    unlockAt: letter.lock.kind === "capsule" ? letter.lock.unlockAt : undefined,
+    question: letter.lock.kind === "riddle" ? letter.lock.question : undefined,
+    attemptsRemaining:
+      letter.lock.kind === "riddle"
+        ? Math.max(0, RIDDLE_MAX_ATTEMPTS - letter.lock.attempts)
+        : undefined,
+    isOpened: letter.openedAt !== null,
+    burnAt: letter.burnAt,
+    burnAfterReading: letter.burnAfterReading,
+    reaction: letter.reaction,
+    published: letter.published,
+    senderName: letter.senderName,
+  };
+
   if (letter.lock.kind === "capsule" && now < letter.lock.unlockAt) {
-    throw new ApiError("LOCKED", "errors.letterLockedCapsule", 423, {
-      unlockAt: [String(letter.lock.unlockAt)],
-    });
+    return { state: "locked", summary: baseSummary };
   }
 
-  // Riddle lock check
-  if (letter.lock.kind === "riddle" && letter.lock.solvedAt === null) {
-    const attemptsLeft = Math.max(0, RIDDLE_MAX_ATTEMPTS - letter.lock.attempts);
-    throw new ApiError("LOCKED", "errors.letterLockedRiddle", 423, {
-      question: [letter.lock.question],
-      attemptsLeft: [String(attemptsLeft)],
-    });
+  if (letter.lock.kind === "riddle" && !letter.lock.solvedAt) {
+    return { state: "locked", summary: baseSummary };
   }
 
-  // First open handling (atomic update)
-  let needsSave = false;
-  if (letter.openedAt === null) {
-    letter.openedAt = now;
-    needsSave = true;
+  const ttl = await letterTtlSeconds(letter);
+  const updatedRaw = await redis.eval<string | null>(
+    OPEN_LETTER_SCRIPT,
+    [keys.letter(letterId), keys.mailboxUnread(usernameLower)],
+    [now, BURN_WINDOW_MS, ttl]
+  );
 
-    if (letter.burnAfterReading) {
-      letter.burnAt = now + BURN_WINDOW_MS;
-      // Shorten Redis TTL to 60s
-      await redis.expire(keys.letter(letterId), 60);
-    }
+  const updatedLetter: LetterRecord = updatedRaw
+    ? typeof updatedRaw === "string"
+      ? JSON.parse(updatedRaw)
+      : updatedRaw
+    : letter;
 
-    // Decrement unread counter clamped to 0
-    const unread = await redis.decr(keys.mailboxUnread(usernameLower));
-    if (unread < 0) {
-      await redis.set(keys.mailboxUnread(usernameLower), 0);
-    }
-  }
+  const openLetter: OpenLetter = {
+    id: updatedLetter.id,
+    recipient: updatedLetter.recipient,
+    body: updatedLetter.body,
+    paper: updatedLetter.paper,
+    stamp: updatedLetter.stamp,
+    hints: updatedLetter.hints,
+    source: updatedLetter.source,
+    createdAt: updatedLetter.createdAt,
+    lock:
+      updatedLetter.lock.kind === "riddle"
+        ? {
+            kind: "riddle",
+            question: updatedLetter.lock.question,
+            attempts: updatedLetter.lock.attempts,
+            solvedAt: updatedLetter.lock.solvedAt,
+          }
+        : updatedLetter.lock,
+    burnAfterReading: updatedLetter.burnAfterReading,
+    openedAt: updatedLetter.openedAt ?? now,
+    burnAt: updatedLetter.burnAt,
+    reaction: updatedLetter.reaction,
+    published: updatedLetter.published,
+    senderName: updatedLetter.senderName,
+    version: 1,
+  };
 
-  if (needsSave) {
-    const ttl = await redis.ttl(keys.letter(letterId));
-    if (ttl > 0) {
-      await redis.set(keys.letter(letterId), JSON.stringify(letter), { ex: ttl });
-    }
-  }
-
-  // Strip answerHash from returned object
-  const safeLetter = { ...letter };
-  if (safeLetter.lock.kind === "riddle") {
-    const { answerHash: _, ...safeRiddle } = safeLetter.lock;
-    safeLetter.lock = safeRiddle as typeof safeLetter.lock;
-  }
-
-  return safeLetter as any;
+  return { state: "open", letter: openLetter };
 }
 
 export async function unlockLetter(
@@ -326,7 +373,7 @@ export async function unlockLetter(
     return { solved: true, body: letter.body };
   }
 
-  if (letter.lock.solvedAt !== null) {
+  if (typeof letter.lock.solvedAt === "number" && letter.lock.solvedAt > 0) {
     return { solved: true, body: letter.body };
   }
 
@@ -335,40 +382,30 @@ export async function unlockLetter(
   }
 
   const incomingHash = hashRiddleAnswer(answer);
-  const isMatch = timingSafeEqual(incomingHash, letter.lock.answerHash);
+  const now = Date.now();
+  const ttl = await letterTtlSeconds(letter);
 
-  const ttl = Math.max(1, await redis.ttl(keys.letter(letterId)));
+  const resRaw = await redis.eval<string>(
+    SOLVE_RIDDLE_SCRIPT,
+    [keys.letter(letterId), keys.mailboxUnread(usernameLower)],
+    [incomingHash, now, RIDDLE_MAX_ATTEMPTS, BURN_WINDOW_MS, ttl]
+  );
 
-  if (!isMatch) {
-    letter.lock.attempts += 1;
-    await redis.set(keys.letter(letterId), JSON.stringify(letter), { ex: ttl });
+  const res = typeof resRaw === "string" ? JSON.parse(resRaw) : resRaw;
 
-    const attemptsRemaining = RIDDLE_MAX_ATTEMPTS - letter.lock.attempts;
-    if (attemptsRemaining <= 0) {
-      throw new ApiError("ATTEMPTS_EXCEEDED", "errors.riddleAttemptsExceeded", 423);
-    }
-
+  if (res.status === "NOT_FOUND") {
+    throw new ApiError("NOT_FOUND", "errors.letterNotFound", 404);
+  }
+  if (res.status === "ATTEMPTS_EXCEEDED") {
+    throw new ApiError("ATTEMPTS_EXCEEDED", "errors.riddleAttemptsExceeded", 423);
+  }
+  if (res.status === "WRONG_ANSWER") {
     throw new ApiError("WRONG_ANSWER", "errors.riddleWrongAnswer", 422, {
-      attemptsRemaining: [String(attemptsRemaining)],
+      attemptsRemaining: [String(res.attemptsRemaining)],
     });
   }
 
-  // Riddle solved!
-  letter.lock.solvedAt = Date.now();
-
-  const now = Date.now();
-  if (letter.openedAt === null) {
-    letter.openedAt = now;
-    if (letter.burnAfterReading) {
-      letter.burnAt = now + BURN_WINDOW_MS;
-      await redis.expire(keys.letter(letterId), 60);
-    }
-    await redis.decr(keys.mailboxUnread(usernameLower));
-  }
-
-  await redis.set(keys.letter(letterId), JSON.stringify(letter), { ex: ttl });
-
-  return { solved: true, body: letter.body };
+  return { solved: true, body: res.body };
 }
 
 export async function deleteLetter(
@@ -383,14 +420,18 @@ export async function deleteLetter(
     if (letter.recipient !== usernameLower) {
       throw new ApiError("FORBIDDEN", "errors.forbidden", 403);
     }
-
-    if (letter.openedAt === null) {
-      await redis.decr(keys.mailboxUnread(usernameLower));
-    }
   }
 
-  await redis.del(keys.letter(letterId));
-  await redis.zrem(keys.mailboxLetters(usernameLower), letterId);
+  await redis.eval<number>(
+    DELETE_LETTER_SCRIPT,
+    [
+      keys.letter(letterId),
+      keys.mailboxLetters(usernameLower),
+      keys.mailboxUnread(usernameLower),
+      keys.letterReactions(letterId),
+    ],
+    [letterId]
+  );
 
   return { deleted: true };
 }
@@ -413,10 +454,20 @@ export async function reactToLetter(
     throw new ApiError("FORBIDDEN", "errors.forbidden", 403);
   }
 
-  letter.reaction = reaction;
-  const ttl = Math.max(1, await redis.ttl(keys.letter(letterId)));
-  await redis.set(keys.letter(letterId), JSON.stringify(letter), { ex: ttl });
-  await redis.hincrby(keys.letterReactions(letterId), reaction, 1);
+  const ttl =
+    letter.burnAfterReading && letter.burnAt !== null
+      ? Math.max(1, Math.ceil((letter.burnAt - Date.now()) / 1000))
+      : await letterTtlSeconds(letter);
+
+  const res = await redis.eval<number>(
+    SET_REACTION_SCRIPT,
+    [keys.letter(letterId), keys.letterReactions(letterId)],
+    [reaction, ttl]
+  );
+
+  if (res === 0) {
+    throw new ApiError("NOT_FOUND", "errors.letterNotFound", 404);
+  }
 
   return { reaction };
 }

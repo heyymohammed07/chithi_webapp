@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getPublicMailbox } from "@/lib/mailbox";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { apiOk, apiErr, ApiError, getViewerHash } from "@/lib/api";
+import { apiOk, apiErr, ApiError, getRateKey, rateLimitHeaders } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,15 +12,12 @@ export async function GET(
 ) {
   try {
     const { username } = await props.params;
-    const viewerHash = getViewerHash(req);
+    const rateKey = getRateKey(req);
 
     // Rate limit public checks: 60 / min
-    const rl = await checkRateLimit("read", viewerHash);
+    const rl = await checkRateLimit("read", rateKey);
     if (!rl.success) {
-      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
-      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, {
-        "Retry-After": String(retryAfter),
-      });
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rl));
     }
 
     const mailboxMeta = await getPublicMailbox(username);

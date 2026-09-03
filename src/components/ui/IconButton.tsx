@@ -20,17 +20,17 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     ref
   ) => {
     const baseStyles =
-      "inline-flex items-center justify-center transition-colors duration-150 rounded-btn min-w-[44px] min-h-[44px] select-none disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2";
+      "inline-flex items-center justify-center transition-colors duration-150 rounded-btn min-w-[44px] min-h-[44px] select-none disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-wax focus-visible:outline-offset-2";
 
     const variantStyles = {
       ghost:
-        "bg-transparent hover:bg-ink-raised text-ash hover:text-ivory border border-transparent",
+        "bg-transparent hover:bg-surface text-ink-muted hover:text-ink border border-transparent",
       secondary:
-        "bg-ink-raised hover:bg-ink-hairline text-ivory border border-ink-hairline hover:border-gold-dim",
+        "bg-surface hover:bg-edge text-ink border border-edge hover:border-wax",
       danger:
-        "bg-transparent hover:bg-wax/20 text-ash hover:text-wax border border-transparent",
+        "bg-transparent hover:bg-danger/20 text-ink-muted hover:text-danger border border-transparent",
       wax:
-        "bg-wax hover:bg-wax-dim text-ivory border border-transparent",
+        "bg-wax hover:bg-wax-dim text-white border border-transparent",
     };
 
     const sizeStyles = {

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { toPng } from "html-to-image";
-import { LetterRecord } from "@/lib/types";
+import { LetterRecord, OpenLetter } from "@/lib/types";
 import { PAPERS } from "@/lib/paper";
 import { useToast } from "@/hooks/useToast";
 import { useLocale } from "@/hooks/useLocale";
@@ -14,7 +14,7 @@ export function useDownloadPostcard(canvasRef: React.RefObject<HTMLDivElement | 
   const { t } = useLocale();
 
   const download = useCallback(
-    async (letter: LetterRecord) => {
+    async (letter: LetterRecord | OpenLetter) => {
       if (!canvasRef.current) {
         showToast(t("postcard.failed"), "error");
         return;

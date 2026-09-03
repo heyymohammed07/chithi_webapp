@@ -3,7 +3,7 @@ import { UnlockLetterSchema } from "@/lib/schemas";
 import { unlockLetter } from "@/lib/letters";
 import { requireMailboxOwner } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { apiOk, apiErr, ApiError, parseJsonBody } from "@/lib/api";
+import { apiOk, apiErr, ApiError, parseJsonBody, rateLimitHeaders } from "@/lib/api";
 import { hashWithPepper } from "@/lib/crypto";
 
 export const runtime = "nodejs";
@@ -16,8 +16,8 @@ export async function POST(
   try {
     const { id } = await props.params;
     const url = new URL(req.url);
-    const username =
-      url.searchParams.get("username") || req.headers.get("x-username");
+    const usernameParam = url.searchParams.get("username");
+    const username = usernameParam?.toLowerCase();
 
     if (!username) {
       throw new ApiError("VALIDATION_FAILED", "errors.validation.usernameRequired", 400);
@@ -30,19 +30,7 @@ export async function POST(
     const rlKey = `${tokenHash}:${id}`;
     const rl = await checkRateLimit("unlock", rlKey);
     if (!rl.success) {
-      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
-      return apiErr(
-        "RATE_LIMITED",
-        "errors.rateLimited",
-        429,
-        undefined,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(rl.limit),
-          "X-RateLimit-Remaining": String(rl.remaining),
-          "X-RateLimit-Reset": String(rl.reset),
-        }
-      );
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rl));
     }
 
     const input = await parseJsonBody(req, UnlockLetterSchema);

@@ -63,19 +63,11 @@ export function PaperSurface({
   // Line height: 32px exact baseline for typewriter notebook ruling, leading-[2] for parchment/rose
   const lineHeightClass = paper === "typewriter" ? "leading-[32px]" : "leading-[2]";
 
-  // Contrast-aware placeholder and text colors per specification
-  const isDarkPaper = paper === "midnight" || paper === "rainy";
-  const paperTextColor = isDarkPaper ? "#FFF8EC" : "#2C1E16";
-  const placeholderClass = isDarkPaper
-    ? "placeholder:text-[#C4B399] text-[#FFF8EC]"
-    : "placeholder:text-[#6B5A4E] text-[#2C1E16]";
-
   return (
     <div
       className={`relative paper-${paper} ${variantStyles[variant]} transition-all duration-300 select-text ${className}`}
       style={{
         fontFamily: resolvedFontFamily,
-        color: paperTextColor,
       }}
     >
       {/* Stamp in Top-Right */}
@@ -114,7 +106,7 @@ export function PaperSurface({
 
       {/* Botanical Sprig Line Art for Rose Paper */}
       {paper === "rose" && (
-        <div className="absolute bottom-5 right-5 pointer-events-none opacity-20 text-[#522E30]">
+        <div className="absolute bottom-5 right-5 pointer-events-none opacity-20 text-current">
           <svg
             width="64"
             height="64"
@@ -140,11 +132,10 @@ export function PaperSurface({
             onChange={(e) => onChange?.(e.target.value)}
             placeholder={placeholder}
             rows={8}
-            className={`w-full bg-transparent border-0 outline-none resize-none overflow-hidden ${placeholderClass} focus:ring-0 focus:outline-none p-0 selection:bg-gold/30`}
+            className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden placeholder:text-current/50 text-inherit focus:ring-0 focus:outline-none p-0 selection:bg-gold/30"
             style={{
               fontFamily: resolvedFontFamily,
-              color: paperTextColor,
-              caretColor: paperTextColor,
+              caretColor: "currentColor",
             }}
           />
         ) : (

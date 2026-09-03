@@ -35,7 +35,7 @@ export function apiErr(
   message: string,
   status: number,
   details?: Record<string, string[]>,
-  extraHeaders?: Record<string, string>
+  extraHeaders?: Record<string, string> | Headers
 ): NextResponse<ApiErr> {
   const headers = new Headers(extraHeaders);
   headers.set("Cache-Control", "no-store");
@@ -57,8 +57,38 @@ export function apiErr(
 }
 
 /**
+ * Returns standardized rate-limiting response headers (§API-03).
+ */
+export function rateLimitHeaders(rl: {
+  limit: number;
+  remaining: number;
+  reset: number;
+}): Record<string, string> {
+  const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+  return {
+    "Retry-After": String(retryAfter),
+    "X-RateLimit-Limit": String(rl.limit),
+    "X-RateLimit-Remaining": String(rl.remaining),
+    "X-RateLimit-Reset": String(rl.reset),
+  };
+}
+
+/**
+ * Derives a privacy-preserving rate-limiting key from IP + IP_SALT.
+ * Raw IP is never retained. Used exclusively for rate limiters.
+ */
+export function getRateKey(req: Request): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  const ip = forwarded
+    ? forwarded.split(",")[0]?.trim() ?? "unknown"
+    : req.headers.get("x-real-ip") ?? "unknown";
+
+  return sha256(`${ip}:${env.IP_SALT}`).slice(0, 32);
+}
+
+/**
  * Derives a privacy-preserving viewer hash from IP + User Agent + IP_SALT.
- * Raw IP is never retained.
+ * Raw IP is never retained. Used strictly for deduplication (reactions, flood guard, bottle pairing).
  */
 export function getViewerHash(req: Request): string {
   const forwarded = req.headers.get("x-forwarded-for");

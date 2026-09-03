@@ -20,19 +20,19 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      "inline-flex items-center justify-center font-medium transition-all duration-150 rounded-full select-none disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E88B60] focus-visible:outline-offset-2";
+      "inline-flex items-center justify-center font-medium transition-all duration-150 rounded-full select-none disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-wax focus-visible:outline-offset-2";
 
     const variantStyles = {
       primary:
-        "bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] active:bg-[#FCD34D] border border-[#FCD34D] shadow-sm font-semibold",
+        "bg-peach hover:bg-peach-hover text-ink active:bg-peach-hover border border-peach-hover shadow-sm font-semibold",
       secondary:
-        "bg-[#FFF8F0] dark:bg-[#1E0F2E] hover:bg-[#FFE5B4]/50 dark:hover:bg-[#2B143D] text-[#382A22] dark:text-[#FFF8F0] border border-[#F0E2D2] dark:border-[#351D4D] hover:border-[#E88B60] shadow-sm",
+        "bg-surface hover:bg-peach/50 text-ink border border-edge hover:border-wax shadow-sm",
       outline:
-        "bg-transparent hover:bg-[#FFF8F0] dark:hover:bg-[#1E0F2E] text-[#382A22] dark:text-[#FFF8F0] border border-[#F0E2D2] dark:border-[#351D4D] hover:border-[#E88B60]",
+        "bg-transparent hover:bg-surface text-ink border border-edge hover:border-wax",
       ghost:
-        "bg-transparent hover:bg-[#FFF8F0] dark:hover:bg-[#1E0F2E] text-[#857367] dark:text-[#C5B3A6] hover:text-[#382A22] dark:hover:text-[#FFF8F0] border border-transparent",
+        "bg-transparent hover:bg-surface text-ink-muted hover:text-ink border border-transparent",
       danger:
-        "bg-[#E88B60] hover:bg-[#D67448] text-white active:bg-[#D67448] border border-transparent",
+        "bg-danger hover:bg-danger/90 text-white active:bg-danger/90 border border-transparent",
     };
 
     const sizeStyles = {

@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/Button";
 import { useLocale } from "@/hooks/useLocale";
 import { useToast } from "@/hooks/useToast";
 import { useAccessToken } from "@/hooks/useAccessToken";
+import { useSession } from "@/hooks/useSession";
 import { KeyRound, AlertTriangle } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
 export default function RecoverPage() {
   const router = useRouter();
   const { t } = useLocale();
   const { showToast } = useToast();
+  const { refresh } = useSession();
 
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -94,6 +97,7 @@ export default function RecoverPage() {
 
       if (json.ok) {
         saveToken(json.data.accessToken);
+        await refresh();
         showToast("Access restored successfully", "success");
         router.push(`/inbox/${json.data.username}`);
       } else {
@@ -117,25 +121,26 @@ export default function RecoverPage() {
     <PageShell>
       <div className="max-w-md mx-auto py-12 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl border border-[#FDE68A] flex items-center justify-center text-[#D9534F] bg-[#FEF3C7] mx-auto mb-3 shadow-sm">
-            <KeyRound size={22} strokeWidth={1.5} />
+          <div className="w-12 h-12 rounded-2xl border border-warn-edge flex items-center justify-center text-wax bg-warn-surface mx-auto mb-3 shadow-sm">
+            <KeyRound size={22} strokeWidth={1.5} aria-hidden="true" />
           </div>
-          <h1 className="text-2xl font-serif font-bold text-[#2C1E16] dark:text-[#FFF8F0]">
+          <h1 className="text-2xl font-serif font-bold text-ink">
             {t("recover.title")}
           </h1>
-          <p className="text-xs text-[#7C7069] dark:text-[#A8988B] leading-relaxed">
+          <p className="text-xs text-ink-muted leading-relaxed">
             {t("recover.subtitle")}
           </p>
         </div>
 
-        <div className="border border-[#F0E2D2] dark:border-white/10 rounded-2xl sm:rounded-3xl bg-[#FFFDF9] dark:bg-[#120d1d] p-6 sm:p-8 shadow-xl relative">
+        <div className="border border-edge rounded-2xl sm:rounded-3xl bg-surface p-6 sm:p-8 shadow-xl relative">
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <label className="block text-xs font-mono uppercase tracking-wider text-[#7C7069] dark:text-[#A8988B]">
+              <label htmlFor="recover-name" className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
                 {t("recover.nameLabel")}
               </label>
               <Input
+                id="recover-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Rahim Ahmed"
@@ -145,10 +150,11 @@ export default function RecoverPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-mono uppercase tracking-wider text-[#7C7069] dark:text-[#A8988B]">
+              <label htmlFor="recover-username" className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
                 {t("recover.usernameLabel")}
               </label>
               <Input
+                id="recover-username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="e.g. rahim-ahmed"
@@ -157,14 +163,16 @@ export default function RecoverPage() {
             </div>
 
             {/* Segmented 6-digit input */}
-            <div className="space-y-2">
-              <label className="block text-xs font-mono uppercase tracking-wider text-[#7C7069] dark:text-[#A8988B]">
+            <div className="space-y-2" role="group" aria-labelledby="passcode-label">
+              <span id="passcode-label" className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
                 {t("recover.passcodeLabel")}
-              </label>
+              </span>
               <div className="flex items-center justify-between gap-2">
                 {digits.map((digit, idx) => (
                   <input
                     key={idx}
+                    id={`passcode-digit-${idx + 1}`}
+                    aria-label={`Digit ${idx + 1}`}
                     ref={(el) => {
                       inputRefs.current[idx] = el;
                     }}
@@ -176,18 +184,22 @@ export default function RecoverPage() {
                     onChange={(e) => handleDigitChange(idx, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(idx, e)}
                     onPaste={handlePaste}
-                    className="w-12 h-14 text-center font-mono text-xl font-bold bg-white dark:bg-[#251338] text-[#2C1E16] dark:text-[#FFF8F0] border border-[#F0E2D2] dark:border-[#4A286D] rounded-2xl focus:outline-none focus:border-[#E88B60] focus:ring-1 focus:ring-[#E88B60] transition-all"
+                    className="w-12 h-14 text-center font-mono text-xl font-bold bg-surface text-ink border border-edge rounded-2xl focus:outline-none focus:border-wax focus:ring-1 focus:ring-wax transition-all"
                   />
                 ))}
               </div>
             </div>
 
             {errorMsg && (
-              <div className="flex items-center gap-2 text-xs text-[#D9534F] bg-[#FEF2F2] dark:bg-[#3B1219] p-3 rounded-2xl border border-[#FCA5A5] dark:border-[#7F1D1D]">
-                <AlertTriangle size={16} strokeWidth={1.5} className="shrink-0" />
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="flex items-center gap-2 text-xs text-danger bg-danger/10 p-3 rounded-2xl border border-danger/20"
+              >
+                <AlertTriangle size={16} strokeWidth={1.5} className="shrink-0" aria-hidden="true" />
                 <span>
                   {errorMsg}
-                  {retryAfter && ` (${retryAfter}s)`}
+                  {retryAfter ? ` (retry ${formatDistanceToNow(new Date(Date.now() + retryAfter * 1000), { addSuffix: true })})` : null}
                 </span>
               </div>
             )}
@@ -196,7 +208,7 @@ export default function RecoverPage() {
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full rounded-full bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] font-semibold border border-[#F0D59E]"
+              className="w-full rounded-full bg-peach hover:bg-gold text-ink font-semibold border border-gold/40"
               isLoading={isSubmitting}
             >
               {t("recover.submit")}

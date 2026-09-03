@@ -3,18 +3,19 @@ import { getRedis } from "./redis";
 import { keys } from "./keys";
 import { hashWithPepper, timingSafeEqual } from "./crypto";
 import { ApiError } from "./api";
-import { SEVEN_DAYS_MS } from "./constants";
-import { purgeInactiveMailbox, touchMailboxLogin } from "./mailbox";
+import { touchMailboxLogin } from "./mailbox";
 
 /**
- * Extracts authentication token from cookie or Authorization Bearer header.
+ * Extracts authentication token from Authorization Bearer header first,
+ * then falls back to httpOnly session cookie chithi_s_{usernameLower}.
+ * URL query parameters are strictly forbidden per SEC-01.
  */
 export function extractAuthToken(req: Request, usernameLower: string): string | null {
-  try {
-    const url = new URL(req.url);
-    const keyParam = url.searchParams.get("key");
-    if (keyParam) return keyParam.trim();
-  } catch {}
+  const authHeader = req.headers.get("authorization");
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    const tokenVal = authHeader.slice(7).trim();
+    if (tokenVal) return tokenVal;
+  }
 
   const cookieHeader = req.headers.get("cookie");
   if (cookieHeader) {
@@ -30,13 +31,44 @@ export function extractAuthToken(req: Request, usernameLower: string): string | 
     }
   }
 
-  const authHeader = req.headers.get("authorization");
-  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
-    const tokenVal = authHeader.slice(7).trim();
-    if (tokenVal) return tokenVal;
+  return null;
+}
+
+/**
+ * Derives the active session username from chithi_s_* cookies.
+ * Accepts optional disambiguator when multiple session cookies are present.
+ * Never trusts unauthenticated client-supplied username headers per SEC-07.
+ */
+export function getSessionUsername(req: Request, disambiguator?: string | null): string | null {
+  const cookieHeader = req.headers.get("cookie");
+  if (!cookieHeader) return null;
+
+  const prefix = "chithi_s_";
+  const cookieUsernames: string[] = [];
+
+  for (const c of cookieHeader.split(";")) {
+    const trimmed = c.trim();
+    if (trimmed.startsWith(prefix)) {
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx > prefix.length) {
+        const u = trimmed.slice(prefix.length, eqIdx).trim().toLowerCase();
+        if (u && !cookieUsernames.includes(u)) {
+          cookieUsernames.push(u);
+        }
+      }
+    }
   }
 
-  return null;
+  if (cookieUsernames.length === 0) return null;
+
+  if (disambiguator) {
+    const cleanDisambiguator = disambiguator.trim().toLowerCase();
+    if (cookieUsernames.includes(cleanDisambiguator)) {
+      return cleanDisambiguator;
+    }
+  }
+
+  return cookieUsernames[0] ?? null;
 }
 
 /**
@@ -63,13 +95,6 @@ export async function requireMailboxOwner(
   const mailbox: MailboxRecord =
     typeof rawMailbox === "string" ? JSON.parse(rawMailbox) : rawMailbox;
 
-  // 7-day inactivity purge guard (§2.B)
-  const lastActive = mailbox.lastLoginAt ?? mailbox.createdAt;
-  if (Date.now() - lastActive > SEVEN_DAYS_MS) {
-    await purgeInactiveMailbox(usernameLower);
-    throw new ApiError("GONE", "errors.mailboxExpired", 410);
-  }
-
   // Confirm mailbox is still within lifetime
   if (Date.now() > mailbox.expiresAt) {
     throw new ApiError("GONE", "errors.mailboxExpired", 410);
@@ -82,9 +107,8 @@ export async function requireMailboxOwner(
     throw new ApiError("FORBIDDEN", "errors.forbidden", 403);
   }
 
-  // Touch lastLoginAt and extend 7-day TTL (§1, §2.A)
-  mailbox.lastLoginAt = Date.now();
-  await touchMailboxLogin(usernameLower);
+  // Touch activity index for observability (§PERF-02)
+  await touchMailboxLogin(mailbox);
 
   return { mailbox, token };
 }

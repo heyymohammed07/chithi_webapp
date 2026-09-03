@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef, use } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
 import { CountdownBanner } from "@/components/inbox/CountdownBanner";
@@ -18,7 +18,7 @@ import { MailboxKeyCard } from "@/components/inbox/MailboxKeyCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
-import { LetterRecord, LetterSummary } from "@/lib/types";
+import { LetterRecord, LetterSummary, OpenLetter } from "@/lib/types";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { useToast } from "@/hooks/useToast";
 import { useLocale } from "@/hooks/useLocale";
@@ -33,6 +33,7 @@ export default function InboxPage(props: {
   const usernameLower = username.toLowerCase();
 
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { t, locale } = useLocale();
   const { showToast } = useToast();
@@ -49,6 +50,8 @@ export default function InboxPage(props: {
   const [isLoading, setIsLoading] = useState(true);
   const [isUnauthorized, setIsUnauthorized] = useState(false);
   const [isFaded, setIsFaded] = useState(false);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Active filter: 'all' | 'unread'
   const filterParam = searchParams.get("filter");
@@ -63,7 +66,7 @@ export default function InboxPage(props: {
   }, [filterParam]);
 
   // Active letter reader state
-  const [activeLetter, setActiveLetter] = useState<LetterRecord | null>(null);
+  const [activeLetter, setActiveLetter] = useState<OpenLetter | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
   const [isAnimatingOpen, setIsAnimatingOpen] = useState(false);
   const [openingLetterId, setOpeningLetterId] = useState<string | null>(null);
@@ -86,41 +89,32 @@ export default function InboxPage(props: {
   // Postcard export canvas ref
   const postcardCanvasRef = useRef<HTMLDivElement>(null);
   const { download: downloadPostcard } = useDownloadPostcard(postcardCanvasRef);
-  const [postcardLetter, setPostcardLetter] = useState<LetterRecord | null>(null);
+  const [postcardLetter, setPostcardLetter] = useState<LetterRecord | OpenLetter | null>(null);
 
-  // 1. URL key exchange and token stripping (§8.2)
+  // 1. URL key exchange and token stripping per SEC-01
   useEffect(() => {
     const keyParam = searchParams.get("key");
     if (keyParam) {
+      fetch("/api/session/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, key: keyParam }),
+      })
+        .then((res) => res.json())
+        .catch((err) => console.error("Session exchange error:", err));
+
       saveToken(keyParam);
-      // Strip key from URL to prevent Referer leaks per §8.2
-      router.replace(`/inbox/${username}`);
+      // Strip key from URL to prevent Referer leaks per SEC-01
+      router.replace(pathname, { scroll: false });
     }
-  }, [searchParams, username, saveToken, router]);
+  }, [searchParams, username, saveToken, router, pathname]);
 
   // 2. Load inbox data
   const loadInbox = useCallback(async () => {
     if (!isTokenLoaded) return;
 
     try {
-      // 1. Fetch public metadata first
-      const metaRes = await fetch(`/api/mailbox/${encodeURIComponent(usernameLower)}`);
-      const metaJson = await metaRes.json();
-
-      if (!metaJson.ok) {
-        if (metaRes.status === 410) {
-          setIsFaded(true);
-          setIsLoading(false);
-          return;
-        }
-        setIsUnauthorized(true);
-        setIsLoading(false);
-        return;
-      }
-
-      setMailboxMeta(metaJson.data);
-
-      // 2. Fetch letters list with authentication
+      // 1. Prepare auth headers
       const storedToken =
         token ||
         (typeof window !== "undefined"
@@ -131,6 +125,31 @@ export default function InboxPage(props: {
       if (storedToken) {
         headers["Authorization"] = `Bearer ${storedToken}`;
       }
+
+      // 2. Fetch authenticated profile metadata (§API-05, §UI-02)
+      const profileRes = await fetch(
+        `/api/mailbox/profile?username=${encodeURIComponent(usernameLower)}`,
+        { headers }
+      );
+      const profileJson = await profileRes.json();
+
+      if (!profileJson.ok) {
+        if (profileRes.status === 410) {
+          setIsFaded(true);
+          setIsLoading(false);
+          return;
+        }
+        setIsUnauthorized(true);
+        setIsLoading(false);
+        return;
+      }
+
+      setMailboxMeta({
+        expiresAt: profileJson.data.expiresAt,
+        acceptsBottles: profileJson.data.acceptsBottles,
+      });
+
+      // 3. Fetch letters list with authentication
 
       const listRes = await fetch(
         `/api/letters/list?username=${encodeURIComponent(usernameLower)}`,
@@ -149,6 +168,7 @@ export default function InboxPage(props: {
 
       const letterList: LetterSummary[] = listJson.data?.letters || [];
       setLetters(letterList);
+      setNextCursor(listJson.data?.nextCursor ?? null);
       setUnreadCount(letterList.filter((l) => !l.isOpened).length);
       setIsUnauthorized(false);
     } catch (err) {
@@ -158,6 +178,34 @@ export default function InboxPage(props: {
       setIsLoading(false);
     }
   }, [isTokenLoaded, usernameLower, token]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (nextCursor === null || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const storedToken =
+        token ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem(`chithi:token:${usernameLower}`)
+          : null);
+      const headers: Record<string, string> = {};
+      if (storedToken) headers["Authorization"] = `Bearer ${storedToken}`;
+      const res = await fetch(
+        `/api/letters/list?username=${encodeURIComponent(usernameLower)}&cursor=${nextCursor}`,
+        { headers }
+      );
+      const json = await res.json();
+      if (json.ok && json.data) {
+        const more: LetterSummary[] = json.data.letters || json.data.items || [];
+        setLetters((prev) => [...prev, ...more]);
+        setNextCursor(json.data.nextCursor ?? null);
+      }
+    } catch (err) {
+      console.error("[handleLoadMore error]", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [nextCursor, isLoadingMore, token, usernameLower]);
 
   useEffect(() => {
     loadInbox();
@@ -186,8 +234,19 @@ export default function InboxPage(props: {
 
       const json = await res.json();
 
-      if (json.ok) {
-        const fullLetter: LetterRecord = json.data;
+      if (res.status === 423 || (json.ok && json.data?.state === "locked")) {
+        const summary = json.data?.summary ?? json.data?.lock;
+        if (summary) {
+          setLockedGateData({
+            letterId,
+            lockKind: summary.lockKind === "capsule" || summary.kind === "capsule" ? "capsule" : "riddle",
+            unlockAt: summary.unlockAt,
+            question: summary.question,
+            attemptsLeft: summary.attemptsRemaining ?? 5,
+          });
+        }
+      } else if (json.ok && json.data?.state === "open") {
+        const fullLetter: OpenLetter = json.data.letter;
 
         // Start 3D envelope animation
         setIsAnimatingOpen(true);
@@ -202,24 +261,6 @@ export default function InboxPage(props: {
         if (res.status === 410) {
           showToast(t("errors.letterBurned"), "warn");
           setLetters((prev) => prev.filter((l) => l.id !== letterId));
-        } else if (res.status === 423) {
-          // Locked: show LockedLetterGate
-          const errorDetails = json.error?.details;
-          const unlockAt = errorDetails?.unlockAt?.[0]
-            ? Number(errorDetails.unlockAt[0])
-            : undefined;
-          const question = errorDetails?.question?.[0];
-          const attemptsLeft = errorDetails?.attemptsLeft?.[0]
-            ? Number(errorDetails.attemptsLeft[0])
-            : 5;
-
-          setLockedGateData({
-            letterId,
-            lockKind: unlockAt ? "capsule" : "riddle",
-            unlockAt,
-            question,
-            attemptsLeft,
-          });
         } else {
           showToast(t(json.error?.message || "errors.generic"), "error");
         }
@@ -250,6 +291,7 @@ export default function InboxPage(props: {
         burnAt: foundSummary.burnAt,
         reaction: foundSummary.reaction,
         published: foundSummary.published,
+        senderName: foundSummary.senderName,
         version: 1,
       });
       setLockedGateData(null);
@@ -321,19 +363,19 @@ export default function InboxPage(props: {
     return (
       <PageShell>
         <div className="max-w-md mx-auto py-12">
-          <div className="border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] p-8 text-center space-y-5 shadow-xl transition-colors">
-            <div className="w-12 h-1 bg-[#E88B60] mx-auto rounded-full" />
-            <h1 className="text-2xl font-serif font-bold text-[#2C1E16] dark:text-[#FFF8F0]">
+          <div className="border border-edge rounded-3xl bg-surface p-8 text-center space-y-5 shadow-xl transition-colors">
+            <div className="w-12 h-1 bg-wax mx-auto rounded-full" />
+            <h1 className="text-2xl font-serif font-bold text-ink">
               {t("inbox.fadedTitle")}
             </h1>
-            <p className="text-sm text-[#7C7069] dark:text-[#A8988B] leading-relaxed">
+            <p className="text-sm text-ink-muted leading-relaxed">
               {t("inbox.fadedDesc")}
             </p>
             <div className="pt-2">
               <Link href="/">
                 <button
                   type="button"
-                  className="bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] font-semibold border border-[#F0D59E] shadow-sm px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
+                  className="bg-peach hover:bg-gold text-ink font-semibold border border-gold/40 shadow-sm px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
                 >
                   {t("inbox.createOwn")}
                 </button>
@@ -349,24 +391,24 @@ export default function InboxPage(props: {
   if (isUnauthorized) {
     return (
       <PageShell>
-        <div className="max-w-md mx-auto py-16 text-center space-y-5 border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFF8F0] dark:bg-[#170A24] p-8 shadow-xl transition-colors">
-          <div className="w-12 h-12 rounded-2xl border border-[#FDE68A] dark:border-[#52336B] flex items-center justify-center text-[#E88B60] bg-[#FEF08A] dark:bg-[#2B1B38] mx-auto">
+        <div className="max-w-md mx-auto py-16 text-center space-y-5 border border-edge rounded-3xl bg-surface p-8 shadow-xl transition-colors">
+          <div className="w-12 h-12 rounded-2xl border border-warn-edge flex items-center justify-center text-wax bg-warn-surface mx-auto">
             <ShieldAlert size={24} strokeWidth={1.5} />
           </div>
-          <h1 className="text-xl font-serif font-bold text-[#382A22] dark:text-[#FFF8F0]">
+          <h1 className="text-xl font-serif font-bold text-ink">
             {t("inbox.unauthorizedTitle")}
           </h1>
-          <p className="text-sm text-[#857367] dark:text-[#A592A4] leading-relaxed">
+          <p className="text-sm text-ink-muted leading-relaxed">
             {t("inbox.unauthorizedDesc")}
           </p>
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/recover" className="w-full sm:w-auto">
-              <Button variant="primary" className="w-full rounded-full bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] font-semibold border border-[#F0D59E]">
+              <Button variant="primary" className="w-full rounded-full bg-peach hover:bg-gold text-ink font-semibold border border-gold/40">
                 {t("inbox.usePasscode")}
               </Button>
             </Link>
             <Link href="/" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full rounded-full border-[#F0E2D2] dark:border-[#351D4D]">
+              <Button variant="outline" className="w-full rounded-full border-edge">
                 Home
               </Button>
             </Link>
@@ -393,32 +435,30 @@ export default function InboxPage(props: {
 
         {/* Incoming Letter Notification Opt-in Banner (§4.1) */}
         {isSupported && !isGranted && permission !== "denied" && (
-          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#FFE5B4]/50 dark:bg-[#170A24] border border-[#F0D59E] dark:border-[#351D4D] shadow-sm">
-            <div className="flex items-center gap-2.5 text-xs text-[#382A22] dark:text-[#FFF8F0]">
-              <Bell size={16} className="text-[#E88B60] shrink-0" />
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-peach/50 dark:bg-surface border border-gold/40 dark:border-edge shadow-sm">
+            <div className="flex items-center gap-2.5 text-xs text-ink">
+              <Bell size={16} className="text-wax shrink-0" />
               <span>
-                {locale === "bn"
-                  ? "🔔 নতুন চিঠির নোটিফিকেশন চালু করুন"
-                  : "🔔 Enable browser alerts for new incoming letters"}
+                {t("notifications.enableTitle")}
               </span>
             </div>
             <button
               type="button"
               onClick={requestPermission}
-              className="px-3.5 py-1.5 rounded-full bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] text-xs font-semibold border border-[#F0D59E] shadow-sm transition-transform active:scale-95 cursor-pointer shrink-0"
+              className="px-3.5 py-1.5 rounded-full bg-peach hover:bg-gold text-ink text-xs font-semibold border border-gold/40 shadow-sm transition-transform active:scale-95 cursor-pointer shrink-0"
             >
-              {locale === "bn" ? "অনুমতি দিন" : "Enable Alerts"}
+              {t("notifications.enableAction")}
             </button>
           </div>
         )}
 
         {/* Header Title */}
-        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-[#F0E2D2] dark:border-[#351D4D] pb-4">
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[#382A22] dark:text-[#FFF8F0]">
-            <span className="text-[#E88B60]">@{username}</span>
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-edge pb-4">
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-ink">
+            <span className="text-wax">@{username}</span>
             {t("inbox.title")}
           </h1>
-          <p className="text-xs text-[#857367] dark:text-[#A592A4] font-serif italic">
+          <p className="text-xs text-ink-muted font-serif italic">
             Confidential & Ephemeral
           </p>
         </div>
@@ -450,7 +490,7 @@ export default function InboxPage(props: {
                     navigator.clipboard.writeText(publicLink);
                     showToast(t("keyCard.copied"), "success");
                   }}
-                  className="bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] font-semibold border border-[#F0D59E] shadow-sm px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
+                  className="bg-peach hover:bg-gold text-ink font-semibold border border-gold/40 shadow-sm px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
                 >
                   <Copy size={16} strokeWidth={1.5} />
                   <span>{t("inbox.empty.copyCta")}</span>
@@ -468,7 +508,7 @@ export default function InboxPage(props: {
             if (displayedLetters.length === 0) {
               return (
                 <div className="py-12 text-center space-y-2">
-                  <p className="text-sm font-serif italic text-[#857367] dark:text-[#A592A4]">
+                  <p className="text-sm font-serif italic text-ink-muted">
                     {activeFilter === "unread"
                       ? locale === "bn"
                         ? "কোনো অপঠিত চিঠি নেই।"
@@ -481,7 +521,7 @@ export default function InboxPage(props: {
                     <button
                       type="button"
                       onClick={() => setActiveFilter("all")}
-                      className="text-xs font-mono text-[#E88B60] hover:underline cursor-pointer"
+                      className="text-xs font-mono text-wax hover:underline cursor-pointer"
                     >
                       {locale === "bn" ? "সকল চিঠি দেখুন" : "View all letters"}
                     </button>
@@ -491,16 +531,36 @@ export default function InboxPage(props: {
             }
 
             return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {displayedLetters.map((ltr) => (
-                  <EnvelopeCard
-                    key={ltr.id}
-                    letter={ltr}
-                    onClick={() => handleOpenLetter(ltr.id)}
-                    isOpening={openingLetterId === ltr.id}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {displayedLetters.map((ltr) => (
+                    <EnvelopeCard
+                      key={ltr.id}
+                      letter={ltr}
+                      onClick={() => handleOpenLetter(ltr.id)}
+                      isOpening={openingLetterId === ltr.id}
+                    />
+                  ))}
+                </div>
+
+                {nextCursor !== null && activeFilter === "all" && (
+                  <div className="flex justify-center pt-6">
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={isLoadingMore}
+                      className="px-6 py-2.5 rounded-full text-xs font-mono font-medium border border-edge text-ink-muted bg-surface/40 hover:bg-edge/40 transition-colors disabled:opacity-50"
+                    >
+                      {isLoadingMore
+                        ? locale === "bn"
+                          ? "চিঠি লোড হচ্ছে..."
+                          : "Loading more letters..."
+                        : locale === "bn"
+                        ? "আরও চিঠি দেখুন"
+                        : "Load more letters"}
+                    </button>
+                  </div>
+                )}
+              </>
             );
           })()
         )}

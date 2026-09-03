@@ -88,4 +88,10 @@ export const keys = {
    */
   floodGuard: (viewerHash: string, recipientLower: string): string =>
     `flood:${viewerHash}:${recipientLower.toLowerCase()}`,
+
+  /**
+   * Active mailboxes index sorted set: mb:idx:active
+   * Uses mb:idx: prefix to guarantee zero collision with user mailboxes per DATA-01.
+   */
+  activeIndex: (): string => "mb:idx:active",
 } as const;

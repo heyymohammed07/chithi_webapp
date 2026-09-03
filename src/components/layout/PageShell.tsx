@@ -11,11 +11,11 @@ export function PageShell({
   className?: string;
 }) {
   return (
-    <div className="relative min-h-screen overflow-x-hidden flex flex-col bg-[#FAF7F2] dark:bg-[#0C0314] text-[#2D2522] dark:text-[#F5EBE6] transition-colors duration-200">
+    <div className="relative min-h-screen overflow-x-hidden flex flex-col bg-canvas text-ink transition-colors duration-200">
       {/* Skip link for accessibility */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-[#FFFDF9] focus:text-[#D9534F] focus:border focus:border-[#D9534F] focus:rounded-full shadow-sm"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-canvas focus:text-wax focus:border focus:border-wax focus:rounded-full shadow-sm"
       >
         Skip to content
       </a>

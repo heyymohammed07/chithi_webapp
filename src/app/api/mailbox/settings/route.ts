@@ -10,8 +10,7 @@ export const dynamic = "force-dynamic";
 export async function PATCH(req: NextRequest) {
   try {
     const url = new URL(req.url);
-    const username =
-      url.searchParams.get("username") || req.headers.get("x-username");
+    const username = url.searchParams.get("username");
 
     if (!username) {
       throw new ApiError("VALIDATION_FAILED", "errors.validation.usernameRequired", 400);

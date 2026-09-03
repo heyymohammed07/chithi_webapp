@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { WaxSeal } from "./WaxSeal";
 import { MOTION } from "@/lib/constants";
 import { useReducedMotionSafe } from "@/hooks/useReducedMotionSafe";
@@ -17,25 +17,13 @@ export function EnvelopeOpenAnimation({
 }: EnvelopeOpenAnimationProps) {
   const shouldReduceMotion = useReducedMotionSafe();
 
-  if (!isOpening) return null;
+  React.useEffect(() => {
+    if (isOpening && shouldReduceMotion) {
+      onAnimationComplete();
+    }
+  }, [isOpening, shouldReduceMotion, onAnimationComplete]);
 
-  if (shouldReduceMotion) {
-    // Instantaneous cross-fade in 0.18s per §11.4
-    return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
-          onAnimationComplete={onAnimationComplete}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-        >
-          <WaxSeal isCracked size={56} />
-        </motion.div>
-      </AnimatePresence>
-    );
-  }
+  if (!isOpening || shouldReduceMotion) return null;
 
   // 0.9s 3D animation sequence (§11.4)
   return (
@@ -83,7 +71,7 @@ export function EnvelopeOpenAnimation({
             ease: MOTION.ease,
           }}
           onAnimationComplete={onAnimationComplete}
-          className="absolute inset-x-4 top-4 bottom-4 bg-[#F4EBD9] border border-ink-hairline rounded-envelope z-10"
+          className="absolute inset-x-4 top-4 bottom-4 bg-ivory dark:bg-surface-raised border border-ink-hairline rounded-envelope z-10"
         />
       </motion.div>
     </div>

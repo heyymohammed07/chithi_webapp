@@ -1,4 +1,5 @@
 import { PaperStyleId, StampId, FontId } from "./types";
+import { PAPER_COLORS } from "./theme";
 
 export interface FontDefinition {
   id: FontId;
@@ -204,41 +205,41 @@ export const PAPERS: Record<PaperStyleId, PaperDefinition> = {
     id: "parchment",
     labelKey: "papers.parchment",
     defaultFont: "bnDiary",
-    inkColor: "#2D2522",
-    baseColor: "#F5ECD8",
-    previewSwatch: "bg-[#F5ECD8] border-[#EBE3D5]",
+    inkColor: PAPER_COLORS.parchment.ink,
+    baseColor: PAPER_COLORS.parchment.base,
+    previewSwatch: "bg-surface border-edge",
   },
   midnight: {
     id: "midnight",
     labelKey: "papers.midnight",
     defaultFont: "bnCursive",
-    inkColor: "#E5BC8B",
-    baseColor: "#1A1721",
-    previewSwatch: "bg-[#1A1721] border-[#3D334D]",
+    inkColor: PAPER_COLORS.midnight.ink,
+    baseColor: PAPER_COLORS.midnight.base,
+    previewSwatch: "bg-ink-raised border-edge",
   },
   rose: {
     id: "rose",
     labelKey: "papers.rose",
     defaultFont: "dearSecret",
-    inkColor: "#422835",
-    baseColor: "#F8EBEA",
-    previewSwatch: "bg-[#F8EBEA] border-[#E8DEF8]",
+    inkColor: PAPER_COLORS.rose.ink,
+    baseColor: PAPER_COLORS.rose.base,
+    previewSwatch: "bg-lavender-surface border-lavender-edge",
   },
   typewriter: {
     id: "typewriter",
     labelKey: "papers.typewriter",
     defaultFont: "bnTypewriter",
-    inkColor: "#28241D",
-    baseColor: "#F3EBD9",
-    previewSwatch: "bg-[#F3EBD9] border-[#EBE3D5]",
+    inkColor: PAPER_COLORS.typewriter.ink,
+    baseColor: PAPER_COLORS.typewriter.base,
+    previewSwatch: "bg-surface border-edge",
   },
   rainy: {
     id: "rainy",
     labelKey: "papers.rainy",
     defaultFont: "bnScribble",
-    inkColor: "#E2E8F0",
-    baseColor: "#202730",
-    previewSwatch: "bg-[#202730] border-[#E0F2FE]",
+    inkColor: PAPER_COLORS.rainy.ink,
+    baseColor: PAPER_COLORS.rainy.base,
+    previewSwatch: "bg-skymist border-skymist-edge",
   },
 };
 
@@ -278,3 +279,14 @@ export function getDeterministicRotation(seed: string): number {
   const normalized = Math.abs(hash) % 1000;
   return (normalized / 1000) * 1.6 - 0.8;
 }
+
+export function getFontName(font: FontDefinition, locale: string): string {
+  return locale === "bn" ? font.nameBn || font.name : font.name;
+}
+
+export function getFontCategory(font: FontDefinition, locale: string): string {
+  return locale === "bn"
+    ? font.categoryBn || font.nameBn || font.category
+    : font.category || font.name;
+}
+

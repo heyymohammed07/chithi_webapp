@@ -14,30 +14,61 @@ export function CountdownBanner({ expiresAt, onExpired }: CountdownBannerProps) 
   const { t } = useLocale();
   const { formatted, isExpired, isWarn, isDanger } = useCountdown(expiresAt);
 
+  // Coarse announcement state (updated at minute intervals rather than every second)
+  const [coarseAnnouncement, setCoarseAnnouncement] = React.useState<string>("");
+
   useEffect(() => {
-    if (isExpired && onExpired) {
-      onExpired();
+    if (isExpired) {
+      setCoarseAnnouncement(t("inbox.countdown.expired") || "Session expired");
+      if (onExpired) onExpired();
+      return;
     }
-  }, [isExpired, onExpired]);
+
+    const updateCoarseText = () => {
+      const msLeft = Math.max(0, expiresAt - Date.now());
+      if (msLeft <= 0) {
+        setCoarseAnnouncement(t("inbox.countdown.expired") || "Session expired");
+        return;
+      }
+      const totalMinutes = Math.ceil(msLeft / 60000);
+      const totalHours = Math.floor(totalMinutes / 60);
+      const remMinutes = totalMinutes % 60;
+
+      if (totalHours > 0) {
+        setCoarseAnnouncement(`${totalHours}h ${remMinutes}m remaining`);
+      } else {
+        setCoarseAnnouncement(`${totalMinutes} minute${totalMinutes === 1 ? "" : "s"} remaining`);
+      }
+    };
+
+    updateCoarseText();
+    const interval = setInterval(updateCoarseText, 30000);
+    return () => clearInterval(interval);
+  }, [expiresAt, isExpired, onExpired, t]);
 
   // Color state styling matching warm vintage stationery
   const bgClass = isDanger
-    ? "bg-[#FEF2F2] border-[#FCA5A5] text-[#D9534F]"
+    ? "bg-danger-surface border-danger-edge text-danger"
     : isWarn
-    ? "bg-[#FEF3C7] border-[#FDE68A] text-[#6D4E12]"
-    : "bg-[#FEF3C7]/90 border-[#FDE68A] text-[#2D2522]";
+    ? "bg-warn-surface border-warn text-warn"
+    : "bg-peach/60 border-edge text-ink";
 
   return (
     <div
-      aria-live="off"
       className={`w-full px-5 py-3.5 border rounded-2xl flex flex-wrap items-center justify-between gap-3 select-none shadow-sm ${bgClass}`}
     >
-      <div className="flex items-center gap-2 text-xs font-mono tracking-wider">
-        <Clock size={16} strokeWidth={1.5} className="text-[#D9534F]" />
-        <span className="text-[#7C7069]">{t("inbox.countdown.label")}</span>
+      {/* Screen-reader coarse live region */}
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {coarseAnnouncement}
+      </span>
+
+      {/* Visual countdown display */}
+      <div aria-hidden="true" className="flex items-center gap-2 text-xs font-mono tracking-wider">
+        <Clock size={16} strokeWidth={1.5} className="text-wax" />
+        <span className="text-ink-muted">{t("inbox.countdown.label")}</span>
       </div>
 
-      <div className="font-serif font-bold text-base sm:text-lg tracking-wider">
+      <div aria-hidden="true" className="font-serif font-bold text-base sm:text-lg tracking-wider">
         {formatted}
       </div>
     </div>

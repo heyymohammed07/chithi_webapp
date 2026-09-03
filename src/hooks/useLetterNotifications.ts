@@ -56,7 +56,7 @@ export function useLetterNotifications(username?: string | null) {
         const currentUnread = json.data?.unreadCount ?? 0;
 
         if (lastUnreadRef.current !== null && currentUnread > lastUnreadRef.current) {
-          const title = locale === "bn" ? "চিঠি এসেছে! 💌" : "New Letter Arrived! 💌";
+          const title = locale === "bn" ? "চিঠি এসেছে!" : "New Letter Arrived!";
           const body =
             locale === "bn"
               ? "আপনার ইনবক্সে একটি নতুন চিঠি এসে পৌঁছেছে। খুলে দেখুন!"
@@ -83,12 +83,28 @@ export function useLetterNotifications(username?: string | null) {
     // Run initial prime
     checkNewLetters();
 
-    // Poll every 35 seconds
-    const interval = setInterval(checkNewLetters, 35000);
+    // Poll every 35 seconds only when document is visible (§UI-04)
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      checkNewLetters();
+    }, 35000);
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        checkNewLetters();
+      }
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
     };
   }, [permission, username, locale, router]);
 

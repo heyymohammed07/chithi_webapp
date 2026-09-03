@@ -29,23 +29,23 @@ export function ReactionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono tracking-wider border transition-colors select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D9534F] focus-visible:outline-offset-2 ${
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono tracking-wider border transition-colors select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-wax focus-visible:outline-offset-2 ${
         hasReacted
-          ? "bg-[#FEF2F2] border-[#FCA5A5] text-[#D9534F]"
-          : "bg-[#FFFDF9] border-[#EBE3D5] text-[#7C7069] hover:text-[#2D2522] hover:border-[#D4A373]"
+          ? "bg-danger-surface border-danger-edge text-danger"
+          : "bg-canvas border-edge text-ink-muted hover:text-ink hover:border-wax/50"
       } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       {type === "heart" ? (
         <Heart
           size={15}
           strokeWidth={1.5}
-          className={hasReacted ? "fill-[#D9534F]" : ""}
+          className={hasReacted ? "fill-danger text-danger" : ""}
         />
       ) : (
         <HeartCrack
           size={15}
           strokeWidth={1.5}
-          className={hasReacted ? "fill-[#D9534F]" : ""}
+          className={hasReacted ? "fill-danger text-danger" : ""}
         />
       )}
       <span className="font-semibold text-[11px]">{formattedCount}</span>

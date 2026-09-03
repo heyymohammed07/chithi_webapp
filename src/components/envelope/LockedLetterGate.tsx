@@ -77,25 +77,25 @@ export function LockedLetterGate({
 
   if (lockKind === "capsule") {
     return (
-      <div className="flex flex-col items-center text-center p-6 sm:p-10 border border-[#EBE3D5] rounded-3xl bg-[#FFFDF9] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] max-w-md mx-auto space-y-4">
-        <div className="w-12 h-12 rounded-2xl border border-[#FDE68A] flex items-center justify-center text-[#D9534F] bg-[#FEF3C7]">
-          <Clock size={24} strokeWidth={1.5} />
+      <div className="flex flex-col items-center text-center p-6 sm:p-10 border border-edge rounded-3xl bg-surface shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] max-w-md mx-auto space-y-4">
+        <div className="w-12 h-12 rounded-2xl border border-gold/40 flex items-center justify-center text-wax bg-peach/50">
+          <Clock size={24} strokeWidth={1.5} aria-hidden="true" />
         </div>
 
         <div>
-          <h3 className="text-lg font-serif font-semibold text-[#2D2522]">
+          <h3 className="text-lg font-serif font-semibold text-ink">
             {t("gate.capsuleTitle")}
           </h3>
-          <p className="text-xs text-[#7C7069] mt-1">
+          <p className="text-xs text-ink-muted mt-1">
             {t("gate.capsuleDesc")}
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl border border-[#FDE68A] bg-[#FEF3C7]/80 w-full space-y-1">
-          <span className="text-xs font-mono uppercase text-[#7C7069] block">
+        <div className="p-4 rounded-2xl border border-gold/40 bg-peach/40 w-full space-y-1">
+          <span className="text-xs font-mono uppercase text-ink-muted block">
             {t("gate.capsuleTimeLeft")}
           </span>
-          <span className="text-2xl font-serif font-bold text-[#2D2522] tracking-wide">
+          <span className="text-2xl font-serif font-bold text-ink tracking-wide">
             {countdown.formatted}
           </span>
         </div>
@@ -108,7 +108,7 @@ export function LockedLetterGate({
 
   return (
     <div
-      className={`flex flex-col items-center text-center p-6 sm:p-10 border border-[#EBE3D5] rounded-3xl bg-[#FFFDF9] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] max-w-md mx-auto space-y-5 transition-transform ${
+      className={`flex flex-col items-center text-center p-6 sm:p-10 border border-edge rounded-3xl bg-surface shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] max-w-md mx-auto space-y-5 transition-transform ${
         isShaking
           ? shouldReduceMotion
             ? "opacity-50"
@@ -116,15 +116,15 @@ export function LockedLetterGate({
           : ""
       }`}
     >
-      <div className="w-12 h-12 rounded-2xl border border-[#FDE68A] flex items-center justify-center text-[#D9534F] bg-[#FEF3C7]">
-        <KeyRound size={24} strokeWidth={1.5} />
+      <div className="w-12 h-12 rounded-2xl border border-gold/40 flex items-center justify-center text-wax bg-peach/50">
+        <KeyRound size={24} strokeWidth={1.5} aria-hidden="true" />
       </div>
 
       <div>
-        <h3 className="text-lg font-serif font-semibold text-[#2D2522]">
+        <h3 className="text-lg font-serif font-semibold text-ink">
           {isExceeded ? t("gate.riddleExceededTitle") : t("gate.riddleTitle")}
         </h3>
-        <p className="text-xs text-[#7C7069] mt-1">
+        <p className="text-xs text-ink-muted mt-1">
           {isExceeded ? t("gate.riddleExceededDesc") : t("gate.riddleDesc")}
         </p>
       </div>
@@ -132,39 +132,48 @@ export function LockedLetterGate({
       {!isExceeded && (
         <form onSubmit={handleRiddleSubmit} className="w-full space-y-4 text-left">
           {/* Riddle Question Display */}
-          <div className="p-4 rounded-2xl border border-[#EBE3D5] bg-[#FAF7F2]">
-            <span className="text-[11px] font-mono uppercase text-[#D9534F] block mb-1">
-              Riddle Question
+          <div className="p-4 rounded-2xl border border-edge bg-canvas">
+            <span className="text-[11px] font-mono uppercase text-wax block mb-1">
+              {t("gate.riddleQuestionTitle")}
             </span>
-            <p className="text-sm font-serif italic text-[#2D2522]">
+            <p className="text-sm font-serif italic text-ink">
               &ldquo;{riddleQuestion}&rdquo;
             </p>
           </div>
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <label className="text-[#7C7069] font-medium">Your Answer</label>
-              <span className="text-[11px] text-[#7C7069] font-mono">
+              <label htmlFor="riddle-answer-input" className="text-ink-muted font-medium">
+                {t("gate.yourAnswer")}
+              </label>
+              <span className="text-[11px] text-ink-muted font-mono">
                 {t("gate.riddleAttemptsLeft")}{" "}
-                <span className="font-bold text-[#2D2522]">
+                <span className="font-bold text-ink">
                   {locale === "bn" ? toBengaliDigits(attemptsLeft) : attemptsLeft}
                 </span>
               </span>
             </div>
 
             <Input
+              id="riddle-answer-input"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               placeholder={t("gate.answerPlaceholder")}
               maxLength={60}
               required
               error={Boolean(errorMsg)}
+              aria-describedby={errorMsg ? "riddle-error" : undefined}
             />
           </div>
 
           {errorMsg && (
-            <div className="flex items-center gap-2 text-xs text-[#D9534F] bg-[#FEF2F2] p-3 rounded-2xl border border-[#FCA5A5]">
-              <AlertTriangle size={14} strokeWidth={1.5} />
+            <div
+              id="riddle-error"
+              role="alert"
+              aria-live="assertive"
+              className="flex items-center gap-2 text-xs text-wax bg-wax/10 p-3 rounded-2xl border border-wax/30"
+            >
+              <AlertTriangle size={14} strokeWidth={1.5} aria-hidden="true" />
               <span>{errorMsg}</span>
             </div>
           )}

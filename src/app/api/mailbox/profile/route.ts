@@ -1,20 +1,28 @@
 import { NextRequest } from "next/server";
-import { requireMailboxOwner } from "@/lib/auth";
+import { getSessionUsername, requireMailboxOwner } from "@/lib/auth";
 import { getRedis } from "@/lib/redis";
 import { keys } from "@/lib/keys";
-import { apiOk, apiErr, ApiError } from "@/lib/api";
+import { checkRateLimit } from "@/lib/ratelimit";
+import { apiOk, apiErr, ApiError, getRateKey, rateLimitHeaders } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const rateKey = getRateKey(req);
+    const rl = await checkRateLimit("read", rateKey);
+    if (!rl.success) {
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rl));
+    }
+
     const url = new URL(req.url);
-    const username =
-      url.searchParams.get("username") || req.headers.get("x-username");
+    const usernameParam = url.searchParams.get("username");
+    // Derive username from session cookie; use ?username= only as disambiguator
+    const username = getSessionUsername(req, usernameParam) || usernameParam;
 
     if (!username) {
-      throw new ApiError("VALIDATION_FAILED", "errors.validation.usernameRequired", 400);
+      throw new ApiError("UNAUTHORIZED", "errors.unauthorized", 401);
     }
 
     // Owner authorization guard: verifies Bearer token or session cookie

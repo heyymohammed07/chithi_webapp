@@ -2,55 +2,48 @@ import { NextRequest } from "next/server";
 import { SendLetterSchema } from "@/lib/schemas";
 import { sendLetter } from "@/lib/letters";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { apiOk, apiErr, ApiError, getViewerHash, parseJsonBody } from "@/lib/api";
+import { apiOk, apiErr, ApiError, getRateKey, getViewerHash, parseJsonBody, rateLimitHeaders } from "@/lib/api";
+import { getRedis } from "@/lib/redis";
+import { keys } from "@/lib/keys";
+import { hashWithPepper, timingSafeEqual } from "@/lib/crypto";
+import { MailboxRecord } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const rateKey = getRateKey(req);
     const viewerHash = getViewerHash(req);
     const input = await parseJsonBody(req, SendLetterSchema);
 
-    // Prevent Self-Letter Sending Guard (§3.2)
+    // Prevent Self-Letter Sending Guard per SEC-02
     const recipientLower = input.recipient.toLowerCase();
-    const senderHeader = req.headers.get("x-sender-username")?.toLowerCase();
-    if (senderHeader && senderHeader === recipientLower) {
-      return new Response(
-        JSON.stringify({ ok: false, error: "You cannot send a letter to your own mailbox." }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    const allCookies = req.cookies.getAll();
+    const selfCookie = allCookies.find((c) => {
+      if (!c.name.startsWith("chithi_s_")) return false;
+      const cookieUsername = c.name.slice("chithi_s_".length).toLowerCase();
+      return cookieUsername === recipientLower;
+    });
 
-    const cookieHeader = req.headers.get("cookie");
-    if (cookieHeader) {
-      const selfCookiePattern = new RegExp(`(^|;\\s*)chithi_s_${recipientLower}=([^;]+)`);
-      const match = cookieHeader.match(selfCookiePattern);
-      if (match && match[2]) {
-        return new Response(
-          JSON.stringify({ ok: false, error: "You cannot send a letter to your own mailbox." }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
+    if (selfCookie && selfCookie.value) {
+      const redis = getRedis();
+      const rawRecipient = await redis.get<string | MailboxRecord>(keys.mailbox(recipientLower));
+      if (rawRecipient) {
+        const mb: MailboxRecord =
+          typeof rawRecipient === "string" ? JSON.parse(rawRecipient) : rawRecipient;
+        const incomingHash = hashWithPepper(decodeURIComponent(selfCookie.value.trim()));
+        if (timingSafeEqual(incomingHash, mb.accessTokenHash)) {
+          return apiErr("FORBIDDEN", "errors.cannotSendToSelf", 403);
+        }
       }
     }
 
-    // Rate limit: 8 / 10m on viewerHash + ":" + recipient (§10.1)
-    const rateLimitKey = `${viewerHash}:${recipientLower}`;
+    // Rate limit: 8 / 10m on rateKey + ":" + recipient (§10.1)
+    const rateLimitKey = `${rateKey}:${recipientLower}`;
     const rl = await checkRateLimit("send", rateLimitKey);
     if (!rl.success) {
-      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
-      return apiErr(
-        "RATE_LIMITED",
-        "errors.rateLimited",
-        429,
-        undefined,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(rl.limit),
-          "X-RateLimit-Remaining": String(rl.remaining),
-          "X-RateLimit-Reset": String(rl.reset),
-        }
-      );
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rl));
     }
 
     const result = await sendLetter(input, viewerHash);

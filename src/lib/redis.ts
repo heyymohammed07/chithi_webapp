@@ -50,12 +50,21 @@ export interface RedisLike {
     scoreMember: { score: number; member: string } | { score: number; member: string }[]
   ): Promise<number>;
   zrem(key: string, ...members: string[]): Promise<number>;
-  zrange(key: string, min: number, max: number, options?: { rev?: boolean }): Promise<string[]>;
+  zrange<T = string>(
+    key: string,
+    min: number | string,
+    max: number | string,
+    options?: { rev?: boolean; byScore?: boolean; offset?: number; count?: number; withScores?: boolean }
+  ): Promise<T[]>;
   zrevrange(key: string, min: number, max: number): Promise<string[]>;
   zremrangebyscore(key: string, min: number | string, max: number | string): Promise<number>;
   zcard(key: string): Promise<number>;
   pipeline(): PipelineLike;
-  keys(pattern: string): Promise<string[]>;
+  scan(
+    cursor: number | string,
+    options?: { match?: string; count?: number }
+  ): Promise<[string, string[]]>;
+  eval<T = unknown>(script: string, keys: string[], args: unknown[]): Promise<T>;
 }
 
 // In-process memory store for development fallback
@@ -64,7 +73,7 @@ interface StoredItem {
   expiresAt: number | null; // epoch ms
 }
 
-class InMemoryRedisShim implements RedisLike {
+export class InMemoryRedisShim implements RedisLike {
   private store = new Map<string, StoredItem>();
   private hashes = new Map<string, { data: Map<string, number | string>; expiresAt: number | null }>();
   private zsets = new Map<string, { data: Map<string, number>; expiresAt: number | null }>();
@@ -101,6 +110,9 @@ class InMemoryRedisShim implements RedisLike {
     options?: { ex?: number; px?: number; nx?: boolean; xx?: boolean; keepTtl?: boolean }
   ): Promise<string | null | "OK"> {
     this.cleanKey(key);
+    if (this.hashes.has(key) || this.zsets.has(key)) {
+      throw new Error("WRONGTYPE Operation against a key holding the wrong kind of value");
+    }
     const exists = this.store.has(key);
 
     if (options?.nx && exists) {
@@ -204,6 +216,9 @@ class InMemoryRedisShim implements RedisLike {
 
   async hincrby(key: string, field: string, increment: number): Promise<number> {
     this.cleanKey(key);
+    if (this.store.has(key) || this.zsets.has(key)) {
+      throw new Error("WRONGTYPE Operation against a key holding the wrong kind of value");
+    }
     let h = this.hashes.get(key);
     if (!h) {
       h = { data: new Map(), expiresAt: null };
@@ -233,6 +248,9 @@ class InMemoryRedisShim implements RedisLike {
     scoreMember: { score: number; member: string } | { score: number; member: string }[]
   ): Promise<number> {
     this.cleanKey(key);
+    if (this.store.has(key) || this.hashes.has(key)) {
+      throw new Error("WRONGTYPE Operation against a key holding the wrong kind of value");
+    }
     let z = this.zsets.get(key);
     if (!z) {
       z = { data: new Map(), expiresAt: null };
@@ -258,21 +276,57 @@ class InMemoryRedisShim implements RedisLike {
     return count;
   }
 
-  async zrange(
+  async zrange<T = string>(
     key: string,
-    min: number,
-    max: number,
-    options?: { rev?: boolean }
-  ): Promise<string[]> {
+    min: number | string,
+    max: number | string,
+    options?: { rev?: boolean; byScore?: boolean; offset?: number; count?: number; withScores?: boolean }
+  ): Promise<T[]> {
     this.cleanKey(key);
     const z = this.zsets.get(key);
     if (!z) return [];
-    const entries = Array.from(z.data.entries());
-    entries.sort((a, b) => (options?.rev ? b[1] - a[1] : a[1] - b[1]));
-    const members = entries.map((e) => e[0]);
-    const start = min < 0 ? Math.max(members.length + min, 0) : min;
-    const end = max < 0 ? members.length + max + 1 : max + 1;
-    return members.slice(start, end);
+    let entries = Array.from(z.data.entries()); // [member, score]
+
+    if (options?.byScore) {
+      const parseBound = (b: number | string) => {
+        if (typeof b === "number") return { val: b, inclusive: true };
+        const str = String(b).trim();
+        if (str === "-inf") return { val: -Infinity, inclusive: true };
+        if (str === "+inf") return { val: Infinity, inclusive: true };
+        if (str.startsWith("(")) return { val: Number(str.slice(1)), inclusive: false };
+        return { val: Number(str), inclusive: true };
+      };
+
+      const minBound = parseBound(min);
+      const maxBound = parseBound(max);
+
+      const low = options.rev ? maxBound : minBound;
+      const high = options.rev ? minBound : maxBound;
+
+      entries = entries.filter(([, score]) => {
+        const afterLow = low.inclusive ? score >= low.val : score > low.val;
+        const beforeHigh = high.inclusive ? score <= high.val : score < high.val;
+        return afterLow && beforeHigh;
+      });
+
+      entries.sort((a, b) => (options.rev ? b[1] - a[1] : a[1] - b[1]));
+
+      if (options.offset !== undefined && options.count !== undefined) {
+        entries = entries.slice(options.offset, options.offset + options.count);
+      }
+    } else {
+      entries.sort((a, b) => (options?.rev ? b[1] - a[1] : a[1] - b[1]));
+      const minNum = Number(min);
+      const maxNum = Number(max);
+      const start = minNum < 0 ? Math.max(entries.length + minNum, 0) : minNum;
+      const end = maxNum < 0 ? entries.length + maxNum + 1 : maxNum + 1;
+      entries = entries.slice(start, end);
+    }
+
+    if (options?.withScores) {
+      return entries.map(([member, score]) => ({ member, score })) as unknown as T[];
+    }
+    return entries.map(([member]) => member) as unknown as T[];
   }
 
   async zrevrange(key: string, min: number, max: number): Promise<string[]> {
@@ -305,18 +359,29 @@ class InMemoryRedisShim implements RedisLike {
     return z ? z.data.size : 0;
   }
 
-  async keys(pattern: string): Promise<string[]> {
+  async scan(
+    cursor: number | string,
+    options?: { match?: string; count?: number }
+  ): Promise<[string, string[]]> {
+    const pattern = options?.match ?? "*";
     const escaped = pattern.replace(/[-[\]{}()+?.,\\^$|#\s]/g, "\\$&").replace(/\*/g, ".*");
     const regex = new RegExp(`^${escaped}$`);
-    const matches: string[] = [];
-
-    for (const key of Array.from(this.store.keys())) {
+    const allKeys = Array.from(
+      new Set([...this.store.keys(), ...this.hashes.keys(), ...this.zsets.keys()])
+    );
+    for (const key of allKeys) {
       this.cleanKey(key);
-      if (this.store.has(key) && regex.test(key)) {
-        matches.push(key);
-      }
     }
-    return matches;
+    const matching = allKeys.filter((k) => regex.test(k));
+    const offset = typeof cursor === "number" ? cursor : parseInt(cursor, 10) || 0;
+    const count = options?.count ?? 10;
+    const page = matching.slice(offset, offset + count);
+    const nextCursor = offset + count < matching.length ? String(offset + count) : "0";
+    return [nextCursor, page];
+  }
+
+  async eval<T = unknown>(_script: string, _keysList: string[], _args: unknown[]): Promise<T> {
+    throw new Error("Lua scripts require a real Redis; set UPSTASH_REDIS_REST_URL");
   }
 
   pipeline(): PipelineLike {
@@ -411,25 +476,37 @@ export function getRedis(): RedisLike {
     return globalForRedis._chithiRedisInstance;
   }
 
-  const hasUpstash =
-    Boolean(env.UPSTASH_REDIS_REST_URL) && Boolean(env.UPSTASH_REDIS_REST_TOKEN);
+  const testUrl = process.env.UPSTASH_TEST_URL;
+  const testToken = process.env.UPSTASH_TEST_TOKEN || "test_token";
+  const redisUrl = testUrl || env.UPSTASH_REDIS_REST_URL;
+  const redisToken = testUrl ? testToken : env.UPSTASH_REDIS_REST_TOKEN;
+
+  const hasUpstash = Boolean(redisUrl) && Boolean(redisToken);
 
   if (hasUpstash) {
     const client = new Redis({
-      url: env.UPSTASH_REDIS_REST_URL,
-      token: env.UPSTASH_REDIS_REST_TOKEN,
+      url: redisUrl,
+      token: redisToken,
     });
-    // Add zrevrange compatibility polyfill for Upstash Redis
-    (client as any).zrevrange = function (key: string, min: number, max: number) {
-      return (this as Redis).zrange(key, min, max, { rev: true });
+    const clientWithCompat = client as unknown as {
+      zrevrange: (key: string, min: number, max: number) => unknown;
+    };
+    clientWithCompat.zrevrange = function (key: string, min: number, max: number) {
+      return client.zrange(key, min, max, { rev: true });
     };
     globalForRedis._chithiRedisInstance = client as unknown as RedisLike;
     return globalForRedis._chithiRedisInstance;
   }
 
+  if (process.env.VERCEL_ENV) {
+    throw new Error(
+      "InMemoryRedisShim is not permitted in deployed environments (VERCEL_ENV is set). Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN."
+    );
+  }
+
   if (!globalForRedis._hasLoggedDevWarning) {
-    console.info(
-      "[chithi] No Upstash credentials — using in-memory store. Data resets on reload. Dev only."
+    console.warn(
+      "[chithi] WARNING: Running with InMemoryRedisShim. Persistence, type enforcement and atomicity are not emulated. Lua scripts will fail. Do not use in production."
     );
     globalForRedis._hasLoggedDevWarning = true;
   }

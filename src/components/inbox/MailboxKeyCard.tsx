@@ -38,18 +38,18 @@ export function MailboxKeyCard({
       : `/inbox/${username}`);
 
   return (
-    <div className="w-full border border-[#F0E2D2] dark:border-[#351D4D] rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] p-6 sm:p-8 space-y-6 shadow-xl relative overflow-hidden">
+    <div className="w-full border border-edge rounded-3xl bg-canvas dark:bg-surface p-6 sm:p-8 space-y-6 shadow-xl relative overflow-hidden">
       <div className="absolute -top-3 right-8 w-24 h-6 washi-tape-yellow rounded-sm pointer-events-none" />
 
       <div className="flex items-start gap-3.5">
-        <div className="w-11 h-11 rounded-2xl border border-[#FDE68A] dark:border-[#78350F] flex items-center justify-center text-[#D9534F] dark:text-[#FCA5A5] bg-[#FEF3C7] dark:bg-[#3B1B10] shrink-0 shadow-sm">
+        <div className="w-11 h-11 rounded-2xl border border-edge flex items-center justify-center text-wax bg-peach/50 dark:bg-surface-raised shrink-0 shadow-sm">
           <KeyRound size={20} strokeWidth={1.5} />
         </div>
         <div>
-          <h3 className="text-xl font-serif font-bold text-[#2C1E16] dark:text-[#FFF8F0]">
+          <h3 className="text-xl font-serif font-bold text-ink dark:text-ink-heading">
             {t("keyCard.title")}
           </h3>
-          <p className="text-xs text-[#7C7069] dark:text-[#A8988B] mt-0.5 leading-relaxed">
+          <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">
             {t("keyCard.warning")}
           </p>
         </div>
@@ -58,8 +58,8 @@ export function MailboxKeyCard({
       <div className="space-y-4">
         {/* Passcode only shown immediately post creation */}
         {isInitialCreation && recoveryPasscode && (
-          <div className="p-4 sm:p-5 rounded-2xl border border-[#FDE68A] dark:border-[#78350F] bg-[#FEF3C7]/60 dark:bg-[#2B1B0E]/60 space-y-2.5">
-            <div className="flex items-center gap-2 text-xs text-[#D9534F] dark:text-[#FCA5A5] font-semibold">
+          <div className="p-4 sm:p-5 rounded-2xl border border-edge bg-peach/40 dark:bg-surface-raised space-y-2.5">
+            <div className="flex items-center gap-2 text-xs text-danger font-semibold">
               <ShieldAlert size={16} strokeWidth={1.5} />
               <span>{t("keyCard.passcodeWarning")}</span>
             </div>
@@ -94,7 +94,7 @@ export function MailboxKeyCard({
           <Button
             variant="primary"
             size="lg"
-            className="w-full bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] font-semibold border border-[#F0D59E]"
+            className="w-full bg-peach hover:bg-peach/80 text-ink font-semibold border border-edge"
             onClick={onEnterInbox}
           >
             {t("keyCard.openInbox")}

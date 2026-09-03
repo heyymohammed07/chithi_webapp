@@ -72,7 +72,6 @@ export interface LetterRecord {
   burnAt: number | null;
   reaction: "heart" | "heartCrack" | null;
   published: boolean;
-  attachedSong?: import("./music").AttachedSong;
   senderName?: string | null;
   version: 1;
 }
@@ -98,14 +97,46 @@ export interface LetterSummary {
   hintCount: number;
   lockKind: "none" | "capsule" | "riddle";
   unlockAt?: number;
+  question?: string;
+  attemptsRemaining?: number;
   isOpened: boolean;
   burnAt: number | null;
   burnAfterReading: boolean;
   reaction: "heart" | "heartCrack" | null;
   published: boolean;
-  attachedSong?: import("./music").AttachedSong;
   senderName?: string | null;
 }
+
+export interface OpenLetter {
+  id: string;
+  recipient: string;
+  body: string;
+  paper: PaperStyleId;
+  stamp: StampId;
+  hints: string[];
+  source: "direct" | "bottle";
+  createdAt: number;
+  lock:
+    | { kind: "none" }
+    | { kind: "capsule"; unlockAt: number }
+    | {
+        kind: "riddle";
+        question: string;
+        attempts: number;
+        solvedAt: number | null;
+      };
+  burnAfterReading: boolean;
+  openedAt: number;
+  burnAt: number | null;
+  reaction: "heart" | "heartCrack" | null;
+  published: boolean;
+  senderName?: string | null;
+  version: 1;
+}
+
+export type LetterView =
+  | { state: "locked"; summary: LetterSummary }
+  | { state: "open"; letter: OpenLetter };
 
 export type ErrorCode =
   | "VALIDATION_FAILED"

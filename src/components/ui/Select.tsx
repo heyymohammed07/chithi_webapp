@@ -10,16 +10,16 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       <div className="relative w-full">
         <select
           ref={ref}
-          className={`w-full min-h-[44px] px-4 py-2.5 pr-9 text-sm bg-[#FFFDF9] text-[#2D2522] rounded-xl border appearance-none transition-colors duration-150 focus:outline-none focus:border-[#D9534F] focus:ring-1 focus:ring-[#D9534F] shadow-sm ${
+          className={`w-full min-h-[44px] px-4 py-2.5 pr-9 text-sm bg-canvas text-ink rounded-xl border appearance-none transition-colors duration-150 focus:outline-none focus:border-wax focus:ring-1 focus:ring-wax shadow-sm ${
             error
-              ? "border-[#D9534F] text-[#D9534F] focus:border-[#D9534F]"
-              : "border-[#EBE3D5] hover:border-[#D4A373]"
+              ? "border-danger text-danger focus:border-danger"
+              : "border-edge hover:border-wax"
           } ${className}`}
           {...props}
         >
           {children}
         </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#7C7069]">
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-ink-muted">
           <svg
             className="w-4 h-4"
             fill="none"

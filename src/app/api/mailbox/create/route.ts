@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { CreateMailboxSchema } from "@/lib/schemas";
 import { createMailbox } from "@/lib/mailbox";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { apiOk, apiErr, ApiError, getViewerHash, parseJsonBody } from "@/lib/api";
+import { apiOk, apiErr, ApiError, getRateKey, parseJsonBody, rateLimitHeaders } from "@/lib/api";
 import { env } from "@/lib/env";
 import { DURATIONS } from "@/lib/constants";
 
@@ -11,24 +11,12 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const viewerHash = getViewerHash(req);
+    const rateKey = getRateKey(req);
 
-    // Rate limit: 3 creates per hour per viewer hash (§10.1)
-    const rl = await checkRateLimit("create", viewerHash);
+    // Rate limit: 3 creates per hour per IP (§10.1)
+    const rl = await checkRateLimit("create", rateKey);
     if (!rl.success) {
-      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
-      return apiErr(
-        "RATE_LIMITED",
-        "errors.rateLimited",
-        429,
-        undefined,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(rl.limit),
-          "X-RateLimit-Remaining": String(rl.remaining),
-          "X-RateLimit-Reset": String(rl.reset),
-        }
-      );
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rl));
     }
 
     const input = await parseJsonBody(req, CreateMailboxSchema);

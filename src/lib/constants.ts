@@ -9,6 +9,28 @@ export const RESERVED_USERNAMES = [
   "bottle",
   "about",
   "recover",
+  "profile",
+  "active",
+  "sitemap",
+  "robots",
+  "manifest",
+  "icon",
+  "favicon",
+  "opengraph-image",
+  "textures",
+  "fonts",
+  "og",
+  "en",
+  "bn",
+  "letter",
+  "letters",
+  "mailbox",
+  "session",
+  "music",
+  "cron",
+  "settings",
+  "privacy",
+  "terms",
   "u",
   "admin",
   "chithi",
@@ -45,9 +67,6 @@ export const DURATIONS = {
   "3d": 259200,
   "7d": 604800,
 } as const;
-
-export const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000; // 604,800,000 ms
-export const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60; // 604,800 seconds
 
 export const FEED_TTL_S = 172800; // 48 hours
 export const MAX_JSON_BODY_BYTES = 16_384;

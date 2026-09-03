@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { LetterRecord, FontId } from "@/lib/types";
+import { LetterRecord, OpenLetter, FontId } from "@/lib/types";
 import { PaperSurface } from "../letter/PaperSurface";
 import { PAPERS } from "@/lib/paper";
 
 export interface PostcardCanvasProps {
-  letter: LetterRecord | null;
+  letter: LetterRecord | OpenLetter | null;
   font?: FontId;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }

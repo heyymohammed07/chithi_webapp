@@ -41,7 +41,11 @@ export function LocaleProvider({
     setLocaleState(next);
     try {
       localStorage.setItem("chithi:locale", next);
-      document.cookie = `chithi_locale=${next}; path=/; max-age=31536000; SameSite=Lax`;
+      fetch("/api/locale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale: next }),
+      }).catch(() => {});
     } catch {
       // Ignore storage errors
     }

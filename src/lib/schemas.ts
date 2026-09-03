@@ -76,17 +76,6 @@ const PaperStyleEnum = z.enum([
 
 const StampEnum = z.enum(["wax", "topSecret", "memory", "heartbreak"]);
 
-export const AttachedSongSchema = z
-  .object({
-    id: z.string(),
-    title: z.string(),
-    artist: z.string(),
-    youtubeId: z.string(),
-    thumbnail: z.string(),
-    duration: z.number().optional(),
-  })
-  .optional();
-
 export const SendLetterSchema = z
   .object({
     recipient: usernameSchema,
@@ -102,10 +91,8 @@ export const SendLetterSchema = z
       .optional()
       .default([]),
     burnAfterReading: z.boolean().default(false),
-    attachedSong: AttachedSongSchema,
     senderName: z.string().trim().max(50).optional().nullable(),
     isAnonymous: z.boolean().default(true),
-    isPublic: z.boolean().default(false),
     mode: z.discriminatedUnion("kind", [
       z.object({ kind: z.literal("none") }),
       z.object({
@@ -156,10 +143,9 @@ export const SendBottleSchema = z
       .optional()
       .default([]),
     target: z.enum(["anyone", "male", "female"]).default("anyone"),
-    attachedSong: AttachedSongSchema,
     senderName: z.string().trim().max(50).optional().nullable(),
+    senderUsername: usernameSchema.optional(),
     isAnonymous: z.boolean().default(true),
-    isPublic: z.boolean().default(false),
   })
   .strict();
 

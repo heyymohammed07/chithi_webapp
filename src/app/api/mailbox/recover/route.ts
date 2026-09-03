@@ -2,31 +2,19 @@ import { NextRequest } from "next/server";
 import { RecoverMailboxSchema } from "@/lib/schemas";
 import { recoverMailbox } from "@/lib/mailbox";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { apiOk, apiErr, ApiError, getViewerHash, parseJsonBody } from "@/lib/api";
+import { apiOk, apiErr, ApiError, getRateKey, parseJsonBody, rateLimitHeaders } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const viewerHash = getViewerHash(req);
+    const rateKey = getRateKey(req);
 
-    // 1. Rate limit by viewer hash: 5 / 10m
-    const rlIp = await checkRateLimit("recover_ip", viewerHash);
+    // 1. Rate limit by IP: 5 / 10m
+    const rlIp = await checkRateLimit("recover_ip", rateKey);
     if (!rlIp.success) {
-      const retryAfter = Math.max(1, Math.ceil((rlIp.reset - Date.now()) / 1000));
-      return apiErr(
-        "RATE_LIMITED",
-        "errors.rateLimited",
-        429,
-        undefined,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(rlIp.limit),
-          "X-RateLimit-Remaining": String(rlIp.remaining),
-          "X-RateLimit-Reset": String(rlIp.reset),
-        }
-      );
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rlIp));
     }
 
     const input = await parseJsonBody(req, RecoverMailboxSchema);
@@ -35,19 +23,7 @@ export async function POST(req: NextRequest) {
     // 2. Rate limit by username: 10 / 1h
     const rlUser = await checkRateLimit("recover_user", usernameLower);
     if (!rlUser.success) {
-      const retryAfter = Math.max(1, Math.ceil((rlUser.reset - Date.now()) / 1000));
-      return apiErr(
-        "RATE_LIMITED",
-        "errors.rateLimited",
-        429,
-        undefined,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(rlUser.limit),
-          "X-RateLimit-Remaining": String(rlUser.remaining),
-          "X-RateLimit-Reset": String(rlUser.reset),
-        }
-      );
+      return apiErr("RATE_LIMITED", "errors.rateLimited", 429, undefined, rateLimitHeaders(rlUser));
     }
 
     const recovered = await recoverMailbox(input);

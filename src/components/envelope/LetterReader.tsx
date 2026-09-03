@@ -1,25 +1,24 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { X, Heart, HeartCrack, Share2, Download, Trash2, Flag, Music, User, EyeOff } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { X, Heart, HeartCrack, Share2, Download, Trash2, Flag, User, EyeOff } from "lucide-react";
 import { PaperSurface } from "../letter/PaperSurface";
 import { BurnTimer } from "./BurnTimer";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
-import { LetterRecord } from "@/lib/types";
+import { LetterRecord, OpenLetter } from "@/lib/types";
 import { useLocale } from "@/hooks/useLocale";
 import { useToast } from "@/hooks/useToast";
-import { useGlobalAudio } from "@/hooks/useGlobalAudio";
 
 export interface LetterReaderProps {
-  letter: LetterRecord | null;
+  letter: LetterRecord | OpenLetter | null;
   isOpen: boolean;
   onClose: () => void;
   onDelete: (letterId: string) => Promise<void>;
   onPublish: (letterId: string) => Promise<void>;
   onReact: (letterId: string, reaction: "heart" | "heartCrack") => Promise<void>;
-  onDownloadPostcard: (letter: LetterRecord) => void;
+  onDownloadPostcard: (letter: LetterRecord | OpenLetter) => void;
   onReport: (letterId: string) => void;
   username: string;
 }
@@ -34,20 +33,80 @@ export function LetterReader({
   onDownloadPostcard,
   onReport,
 }: LetterReaderProps) {
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const { showToast } = useToast();
-  const { playSong } = useGlobalAudio();
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  // Section 20: Auto stream attached song via global YouTube audio engine on open
+  const readerRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    if (isOpen && letter?.attachedSong) {
-      playSong(letter.attachedSong);
+    if (isOpen) {
+      previousActiveElement.current = document.activeElement as HTMLElement;
+
+      const focusableSelector =
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+      const timer = setTimeout(() => {
+        if (readerRef.current) {
+          const focusables = readerRef.current.querySelectorAll<HTMLElement>(focusableSelector);
+          focusables[0]?.focus();
+        }
+      }, 50);
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (confirmDelete || confirmPublish) return;
+
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onCloseRef.current();
+          return;
+        }
+
+        if (e.key === "Tab") {
+          if (!readerRef.current) return;
+          const focusables = Array.from(
+            readerRef.current.querySelectorAll<HTMLElement>(focusableSelector)
+          );
+          if (focusables.length === 0) {
+            e.preventDefault();
+            return;
+          }
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (!first || !last) return;
+
+          if (e.shiftKey) {
+            if (document.activeElement === first || !readerRef.current.contains(document.activeElement)) {
+              e.preventDefault();
+              last.focus();
+            }
+          } else {
+            if (document.activeElement === last || !readerRef.current.contains(document.activeElement)) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        }
+      };
+
+      document.addEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "hidden";
+
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener("keydown", handleKeyDown);
+        document.body.style.overflow = "";
+        previousActiveElement.current?.focus();
+      };
     }
-  }, [isOpen, letter, playSong]);
+  }, [isOpen, confirmDelete, confirmPublish]);
 
   if (!isOpen || !letter) return null;
 
@@ -91,14 +150,19 @@ export function LetterReader({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#2D2522]/60 backdrop-blur-sm overflow-y-auto"
+        ref={readerRef}
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-ink/60 backdrop-blur-sm overflow-y-auto"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="reader-heading"
       >
         <div className="relative w-full max-w-2xl my-auto space-y-4">
           {/* Top Bar with BurnTimer & Attached Song banner */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 flex items-center gap-3">
+              <span id="reader-heading" className="sr-only">
+                {letter.senderName ? `${t("reader.fromSender")} ${letter.senderName}` : t("reader.anonymousSender")}
+              </span>
               {letter.burnAt !== null && (
                 <BurnTimer
                   burnAt={letter.burnAt}
@@ -109,33 +173,21 @@ export function LetterReader({
                 />
               )}
 
-              {letter.attachedSong && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FFFDF9] border border-[#EBE3D5] shadow-sm text-xs text-[#2D2522]">
-                  <Music size={13} className="text-[#D9534F] animate-bounce" />
-                  <span className="font-serif font-medium truncate max-w-[150px] sm:max-w-[200px]">
-                    {letter.attachedSong.title}
-                  </span>
-                  <span className="text-[10px] text-[#7C7069] truncate max-w-[100px]">
-                    · {letter.attachedSong.artist}
-                  </span>
-                </div>
-              )}
-
               {letter.senderName ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFE5B4]/60 border border-[#FCD34D] shadow-xs text-xs text-[#382A22] font-medium">
-                  <User size={13} className="text-[#E88B60]" />
-                  <span>{locale === "bn" ? `প্রেরক: ${letter.senderName}` : `From: ${letter.senderName}`}</span>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-peach/60 border border-gold/50 shadow-xs text-xs text-ink font-medium">
+                  <User size={13} className="text-wax" aria-hidden="true" />
+                  <span>{`${t("reader.fromSender")} ${letter.senderName}`}</span>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FAF7F2] border border-[#EBE3D5] text-[11px] text-[#7C7069] font-mono">
-                  <EyeOff size={12} />
-                  <span>{locale === "bn" ? "বেনামী প্রেরক" : "Anonymous"}</span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface border border-edge text-[11px] text-ink-muted font-mono">
+                  <EyeOff size={12} aria-hidden="true" />
+                  <span>{t("reader.anonymousSender")}</span>
                 </div>
               )}
             </div>
 
             <IconButton label="Close" onClick={onClose} size="sm" variant="secondary">
-              <X size={18} strokeWidth={1.5} />
+              <X size={18} strokeWidth={1.5} aria-hidden="true" />
             </IconButton>
           </div>
 
@@ -176,23 +228,25 @@ export function LetterReader({
           </div>
 
           {/* Action Bar Beneath Letter */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[#FFFDF9] border border-[#EBE3D5] rounded-3xl shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-surface border border-edge rounded-3xl shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)]">
             {/* Left: Keepsake reactions */}
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => handleReact("heart")}
+                aria-label={t("reader.actionReact")}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                   letter.reaction === "heart"
-                    ? "bg-[#FEF2F2] border-[#FCA5A5] text-[#D9534F]"
-                    : "border-transparent text-[#7C7069] hover:text-[#2D2522] hover:bg-[#FAF7F2]"
+                    ? "bg-wax/10 border-wax/40 text-wax"
+                    : "border-transparent text-ink-muted hover:text-ink hover:bg-peach/30"
                 }`}
                 title={t("reader.actionReact")}
               >
                 <Heart
                   size={16}
                   strokeWidth={1.5}
-                  className={letter.reaction === "heart" ? "fill-[#D9534F]" : ""}
+                  aria-hidden="true"
+                  className={letter.reaction === "heart" ? "fill-wax" : ""}
                 />
                 <span>{letter.reaction === "heart" ? t("reader.actionReacted") : t("reader.actionReact")}</span>
               </button>
@@ -200,17 +254,19 @@ export function LetterReader({
               <button
                 type="button"
                 onClick={() => handleReact("heartCrack")}
+                aria-label="Heartbreak reaction"
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                   letter.reaction === "heartCrack"
-                    ? "bg-[#FEF2F2] border-[#FCA5A5] text-[#D9534F]"
-                    : "border-transparent text-[#7C7069] hover:text-[#2D2522] hover:bg-[#FAF7F2]"
+                    ? "bg-wax/10 border-wax/40 text-wax"
+                    : "border-transparent text-ink-muted hover:text-ink hover:bg-peach/30"
                 }`}
                 title="Heartbreak"
               >
                 <HeartCrack
                   size={16}
                   strokeWidth={1.5}
-                  className={letter.reaction === "heartCrack" ? "fill-[#D9534F]" : ""}
+                  aria-hidden="true"
+                  className={letter.reaction === "heartCrack" ? "fill-wax" : ""}
                 />
               </button>
             </div>
@@ -223,7 +279,7 @@ export function LetterReader({
                 size="sm"
                 variant="ghost"
               >
-                <Download size={18} strokeWidth={1.5} />
+                <Download size={18} strokeWidth={1.5} aria-hidden="true" />
               </IconButton>
 
               {!letter.burnAfterReading && !letter.published && (
@@ -233,7 +289,7 @@ export function LetterReader({
                   size="sm"
                   variant="ghost"
                 >
-                  <Share2 size={18} strokeWidth={1.5} />
+                  <Share2 size={18} strokeWidth={1.5} aria-hidden="true" />
                 </IconButton>
               )}
 
@@ -243,7 +299,7 @@ export function LetterReader({
                 size="sm"
                 variant="ghost"
               >
-                <Flag size={18} strokeWidth={1.5} />
+                <Flag size={18} strokeWidth={1.5} aria-hidden="true" />
               </IconButton>
 
               <IconButton
@@ -252,7 +308,7 @@ export function LetterReader({
                 size="sm"
                 variant="danger"
               >
-                <Trash2 size={18} strokeWidth={1.5} />
+                <Trash2 size={18} strokeWidth={1.5} aria-hidden="true" />
               </IconButton>
             </div>
           </div>
@@ -266,7 +322,7 @@ export function LetterReader({
         title={t("reader.confirmDeleteTitle")}
       >
         <div className="space-y-4">
-          <p className="text-sm text-[#7C7069]">
+          <p className="text-sm text-ink-muted">
             {t("reader.confirmDeleteDesc")}
           </p>
           <div className="flex justify-end gap-3">
@@ -276,7 +332,7 @@ export function LetterReader({
               disabled={isActionLoading}
               className="rounded-full"
             >
-              Cancel
+              {t("reader.cancel")}
             </Button>
             <Button
               variant="danger"
@@ -297,7 +353,7 @@ export function LetterReader({
         title={t("reader.confirmPublishTitle")}
       >
         <div className="space-y-4">
-          <p className="text-sm text-[#7C7069] leading-relaxed">
+          <p className="text-sm text-ink-muted leading-relaxed">
             {t("reader.confirmPublishDesc")}
           </p>
           <div className="flex justify-end gap-3">
@@ -307,7 +363,7 @@ export function LetterReader({
               disabled={isActionLoading}
               className="rounded-full"
             >
-              Cancel
+              {t("reader.cancel")}
             </Button>
             <Button
               variant="primary"

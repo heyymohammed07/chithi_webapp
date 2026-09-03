@@ -14,15 +14,15 @@ export function Badge({
   className = "",
 }: BadgeProps) {
   const variantStyles = {
-    default: "bg-[#FFFDF9] text-[#7C7069] border-[#EBE3D5]",
-    gold: "bg-[#FEF3C7] text-[#6D4E12] border-[#FDE68A]",
-    wax: "bg-[#D9534F]/10 text-[#D9534F] border-[#D9534F]/30",
-    warn: "bg-[#FEF3C7] text-[#6D4E12] border-[#FDE68A]",
-    success: "bg-[#D8ECD9] text-[#2E5334] border-[#A7F3D0]",
-    lavender: "bg-[#E8DEF8] text-[#493F60] border-[#D8B4F8]",
-    sage: "bg-[#D8ECD9] text-[#2E5334] border-[#A7F3D0]",
-    buttercup: "bg-[#FEF3C7] text-[#6D4E12] border-[#FDE68A]",
-    skymist: "bg-[#E0F2FE] text-[#1E4868] border-[#BAE6FD]",
+    default: "bg-surface text-ink-muted border-edge",
+    gold: "bg-peach text-peach-text border-peach-hover",
+    wax: "bg-wax/10 text-wax border-wax/30",
+    warn: "bg-warn-surface text-warn-text border-warn-edge",
+    success: "bg-success-surface text-success-text border-success-edge",
+    lavender: "bg-lavender text-lavender-text border-edge",
+    sage: "bg-success-surface text-success-text border-success-edge",
+    buttercup: "bg-warn-surface text-warn-text border-warn-edge",
+    skymist: "bg-skymist text-skymist-text border-edge",
   };
 
   const sizeStyles = {

@@ -25,6 +25,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useLetterNotifications } from "@/hooks/useLetterNotifications";
+import { useSession } from "@/hooks/useSession";
 
 interface ProfileData {
   username: string;
@@ -38,8 +39,8 @@ interface ProfileData {
 export default function ProfilePage() {
   const router = useRouter();
   const { t, locale } = useLocale();
+  const { sessions, activeUsername, setActiveUsername, logout, isLoading: isSessionLoading } = useSession();
 
-  const [activeUsername, setActiveUsername] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
@@ -52,34 +53,12 @@ export default function ProfilePage() {
   const { permission, isSupported, isGranted, requestPermission } =
     useLetterNotifications(profileData?.username || activeUsername);
 
-  // 1. Locate active session on client mount
+  // Sync loading state when session is loading and no username
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("chithi:token:")) {
-          const u = key.replace("chithi:token:", "").trim();
-          if (u) {
-            setActiveUsername(u);
-            return;
-          }
-        }
-      }
-
-      const match = document.cookie.match(/chithi_s_([a-zA-Z0-9_-]+)=/);
-      if (match && match[1]) {
-        setActiveUsername(match[1]);
-        return;
-      }
-
-      setActiveUsername(null);
-      setLoading(false);
-    } catch {
-      setActiveUsername(null);
+    if (!isSessionLoading && !activeUsername) {
       setLoading(false);
     }
-  }, []);
+  }, [isSessionLoading, activeUsername]);
 
   // 2. Fetch authoritative profile data from server
   const fetchProfile = useCallback(async () => {
@@ -151,25 +130,19 @@ export default function ProfilePage() {
     }
   };
 
-  // Handle safe session disconnect
-  const handleDisconnect = () => {
-    if (activeUsername) {
-      clearToken();
-      if (typeof document !== "undefined") {
-        document.cookie = `chithi_s_${activeUsername.toLowerCase()}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-      }
-    }
-    setActiveUsername(null);
+  // Handle safe session disconnect per SEC-08
+  const handleDisconnect = async () => {
+    await logout();
     setProfileData(null);
     setIsDisconnectModalOpen(false);
-    router.push("/");
+    router.replace("/");
   };
 
   const publicUrl =
     typeof window !== "undefined" && profileData
       ? `${window.location.origin}/${profileData.username}`
       : profileData
-      ? `https://mychithi.vercel.app/${profileData.username}`
+      ? `${process.env.NEXT_PUBLIC_APP_URL || ""}/${profileData.username}`
       : "";
 
   return (
@@ -179,7 +152,7 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-mono text-[#7C7069] dark:text-[#A8988B] hover:text-[#2C1E16] dark:hover:text-[#FFF8F0] transition-colors group cursor-pointer"
+            className="inline-flex items-center gap-2 text-xs font-mono text-ink-muted hover:text-ink transition-colors group cursor-pointer"
           >
             <ArrowLeft
               size={14}
@@ -192,7 +165,7 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={fetchProfile}
-              className="inline-flex items-center gap-1.5 text-xs font-mono text-[#7C7069] dark:text-[#A8988B] hover:text-[#2C1E16] dark:hover:text-[#FFF8F0] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-mono text-ink-muted hover:text-ink transition-colors cursor-pointer"
             >
               <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
               <span>{locale === "bn" ? "রিফ্রেশ" : "Refresh"}</span>
@@ -202,31 +175,31 @@ export default function ProfilePage() {
 
         {/* STATE 1: Initial Loading Skeleton */}
         {loading && !profileData && (
-          <div className="p-8 sm:p-12 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-xl text-center space-y-4 max-w-md mx-auto">
-            <div className="w-12 h-12 rounded-2xl bg-[#FFE5B4]/50 dark:bg-[#2B143D] flex items-center justify-center text-[#E88B60] mx-auto animate-pulse">
+          <div className="p-8 sm:p-12 rounded-3xl bg-surface border border-edge shadow-xl text-center space-y-4 max-w-md mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-peach/50 dark:bg-canvas flex items-center justify-center text-wax mx-auto animate-pulse">
               <Sparkles size={24} />
             </div>
             <div className="space-y-2">
-              <div className="h-5 w-32 bg-[#EBE3D5] dark:bg-[#351D4D] rounded-full mx-auto animate-pulse" />
-              <div className="h-3 w-48 bg-[#EBE3D5]/60 dark:bg-[#351D4D]/60 rounded-full mx-auto animate-pulse" />
+              <div className="h-5 w-32 bg-edge rounded-full mx-auto animate-pulse" />
+              <div className="h-3 w-48 bg-edge/60 rounded-full mx-auto animate-pulse" />
             </div>
           </div>
         )}
 
         {/* STATE 2: Unauthorized / No Active Session */}
         {!loading && !profileData && (errorStatus === 401 || errorStatus === 403 || !activeUsername) && (
-          <div className="p-8 sm:p-12 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] text-center space-y-5 max-w-lg mx-auto relative overflow-hidden transition-colors">
+          <div className="p-8 sm:p-12 rounded-3xl bg-surface border border-edge shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] text-center space-y-5 max-w-lg mx-auto relative overflow-hidden transition-colors">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-28 h-6 washi-tape-buttercup rounded-sm" />
 
-            <div className="w-16 h-16 rounded-2xl bg-[#FEF3C7] dark:bg-[#2B1B38] border border-[#FDE68A] dark:border-[#52336B] flex items-center justify-center text-[#D9534F] mx-auto shadow-sm">
+            <div className="w-16 h-16 rounded-2xl bg-warn-surface border border-warn-edge flex items-center justify-center text-wax mx-auto shadow-sm">
               <Inbox size={28} strokeWidth={1.5} />
             </div>
 
             <div className="space-y-1.5">
-              <h2 className="text-2xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+              <h2 className="text-2xl font-serif font-bold text-ink">
                 {t("profile.unauthorizedTitle")}
               </h2>
-              <p className="text-xs sm:text-sm text-[#7C7069] dark:text-[#A592A4] leading-relaxed max-w-sm mx-auto">
+              <p className="text-xs sm:text-sm text-ink-muted leading-relaxed max-w-sm mx-auto">
                 {t("profile.unauthorizedDesc")}
               </p>
             </div>
@@ -236,7 +209,7 @@ export default function ProfilePage() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full rounded-full gap-2 font-medium shadow-sm bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] border border-[#F0D59E]"
+                  className="w-full rounded-full gap-2 font-medium shadow-sm bg-peach hover:bg-gold text-ink border border-gold/40"
                 >
                   <KeyRound size={16} />
                   <span>{t("profile.loginAction")}</span>
@@ -246,7 +219,7 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   size="md"
-                  className="w-full rounded-full border-[#EBE3D5] dark:border-[#351D4D] hover:bg-[#FAF7F2] dark:hover:bg-[#1E0F2E] text-[#2D2522] dark:text-[#FFF8F0]"
+                  className="w-full rounded-full border-edge hover:bg-canvas text-ink"
                 >
                   {t("profile.homeAction")}
                 </Button>
@@ -257,16 +230,16 @@ export default function ProfilePage() {
 
         {/* STATE 3: Expired Mailbox */}
         {!loading && errorStatus === 410 && (
-          <div className="p-8 sm:p-12 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] text-center space-y-5 max-w-lg mx-auto relative overflow-hidden transition-colors">
-            <div className="w-16 h-16 rounded-2xl bg-[#FEE2E2] dark:bg-[#3B1219] border border-[#FECACA] dark:border-[#7F1D1D] flex items-center justify-center text-[#DC2626] mx-auto shadow-sm">
+          <div className="p-8 sm:p-12 rounded-3xl bg-surface border border-edge shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] text-center space-y-5 max-w-lg mx-auto relative overflow-hidden transition-colors">
+            <div className="w-16 h-16 rounded-2xl bg-danger/10 border border-danger/20 flex items-center justify-center text-danger mx-auto shadow-sm">
               <Clock size={28} strokeWidth={1.5} />
             </div>
 
             <div className="space-y-1.5">
-              <h2 className="text-2xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+              <h2 className="text-2xl font-serif font-bold text-ink">
                 {t("profile.statusExpired")}
               </h2>
-              <p className="text-xs sm:text-sm text-[#7C7069] dark:text-[#A592A4] leading-relaxed max-w-sm mx-auto">
+              <p className="text-xs sm:text-sm text-ink-muted leading-relaxed max-w-sm mx-auto">
                 {t("profile.expiredMessage")}
               </p>
             </div>
@@ -276,7 +249,7 @@ export default function ProfilePage() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full rounded-full gap-2 font-medium shadow-sm bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] border border-[#F0D59E]"
+                  className="w-full rounded-full gap-2 font-medium shadow-sm bg-peach hover:bg-gold text-ink border border-gold/40"
                 >
                   <Sparkles size={16} />
                   <span>{t("profile.createAnother")}</span>
@@ -288,15 +261,15 @@ export default function ProfilePage() {
 
         {/* STATE 4: Network / API Error */}
         {!loading && errorStatus && errorStatus !== 410 && errorStatus !== 401 && errorStatus !== 403 && (
-          <div className="p-8 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#EBE3D5] dark:border-[#351D4D] shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] text-center space-y-4 max-w-md mx-auto transition-colors">
-            <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] border border-[#FCA5A5] flex items-center justify-center text-[#D9534F] mx-auto">
+          <div className="p-8 rounded-3xl bg-surface border border-edge shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] text-center space-y-4 max-w-md mx-auto transition-colors">
+            <div className="w-12 h-12 rounded-2xl bg-danger/10 border border-danger/20 flex items-center justify-center text-wax mx-auto">
               <AlertCircle size={22} />
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+              <h3 className="text-lg font-serif font-bold text-ink">
                 {t("errors.generic")}
               </h3>
-              <p className="text-xs text-[#7C7069] dark:text-[#A592A4]">
+              <p className="text-xs text-ink-muted">
                 {t("errors.internal")}
               </p>
             </div>
@@ -304,7 +277,7 @@ export default function ProfilePage() {
               variant="outline"
               size="sm"
               onClick={fetchProfile}
-              className="rounded-full gap-1.5 mx-auto border-[#EBE3D5] dark:border-[#351D4D] text-[#2D2522] dark:text-[#FFF8F0]"
+              className="rounded-full gap-1.5 mx-auto border-edge text-ink"
             >
               <RefreshCw size={14} />
               <span>{t("profile.retry")}</span>
@@ -315,21 +288,55 @@ export default function ProfilePage() {
         {/* STATE 5: Active Authenticated Profile */}
         {!loading && profileData && !errorStatus && (
           <div className="space-y-6">
+            {/* Multiple Sessions Mailbox Switcher per UI-01 */}
+            {sessions.length > 1 && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-edge shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
+                <div className="flex items-center gap-2 text-xs font-mono text-ink-muted">
+                  <RefreshCw size={14} className="text-wax" />
+                  <span>{locale === "bn" ? "মেইলবক্স পরিবর্তন করুন:" : "Switch Mailbox:"}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {sessions.map((s) => {
+                    const isActive = s.username.toLowerCase() === activeUsername?.toLowerCase();
+                    return (
+                      <button
+                        key={s.username}
+                        type="button"
+                        onClick={() => setActiveUsername(s.username)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-mono transition-all cursor-pointer ${
+                          isActive
+                            ? "bg-wax text-white shadow-sm font-semibold"
+                            : "bg-edge/40 text-ink-muted hover:bg-edge"
+                        }`}
+                      >
+                        @{s.username}
+                        {s.unreadCount > 0 && (
+                          <span className="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] bg-wax text-white">
+                            {s.unreadCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Incoming Letter Notification Opt-in Banner */}
             {isSupported && !isGranted && permission !== "denied" && (
-              <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#FFE5B4]/50 dark:bg-[#170A24] border border-[#F0D59E] dark:border-[#351D4D] shadow-sm">
-                <div className="flex items-center gap-2.5 text-xs text-[#382A22] dark:text-[#FFF8F0]">
-                  <Bell size={16} className="text-[#E88B60] shrink-0" />
+              <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-peach/50 dark:bg-surface border border-gold/40 dark:border-edge shadow-sm">
+                <div className="flex items-center gap-2.5 text-xs text-ink">
+                  <Bell size={16} className="text-wax shrink-0" />
                   <span>
                     {locale === "bn"
-                      ? "🔔 নতুন চিঠির নোটিফিকেশন চালু করুন"
-                      : "🔔 Enable browser alerts for new incoming letters"}
+                      ? "নতুন চিঠির নোটিফিকেশন চালু করুন"
+                      : "Enable browser alerts for new incoming letters"}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={requestPermission}
-                  className="px-3.5 py-1.5 rounded-full bg-[#FFE5B4] hover:bg-[#FCD34D] text-[#382A22] text-xs font-semibold border border-[#F0D59E] shadow-sm transition-transform active:scale-95 cursor-pointer shrink-0"
+                  className="px-3.5 py-1.5 rounded-full bg-peach hover:bg-gold text-ink text-xs font-semibold border border-gold/40 shadow-sm transition-transform active:scale-95 cursor-pointer shrink-0"
                 >
                   {locale === "bn" ? "অনুমতি দিন" : "Enable Alerts"}
                 </button>
@@ -357,23 +364,23 @@ export default function ProfilePage() {
               <Link href={`/inbox/${profileData.username}`} className="block w-full">
                 <button
                   type="button"
-                  className="w-full py-4 px-6 rounded-2xl bg-[#f5dfb8] hover:bg-[#ebd0a0] text-stone-900 font-semibold text-base shadow-lg hover:shadow-amber-500/10 transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] cursor-pointer"
+                  className="w-full py-4 px-6 rounded-2xl bg-peach hover:bg-gold text-ink font-semibold text-base shadow-lg transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] cursor-pointer border border-edge"
                 >
-                  <Mail className="w-5 h-5 text-stone-800" />
-                  <span>{locale === "bn" ? "📬 গোপন ইনবক্স খুলুন" : "Open Secret Inbox"}</span>
+                  <Mail className="w-5 h-5 text-ink" />
+                  <span>{locale === "bn" ? "গোপন ইনবক্স খুলুন" : "Open Secret Inbox"}</span>
                 </button>
               </Link>
             </div>
 
             {/* 4. Public Mailbox URL Card (One-Tap Copy) */}
-            <div className="relative p-6 sm:p-7 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl space-y-3 overflow-hidden transition-colors">
+            <div className="relative p-6 sm:p-7 rounded-3xl bg-surface border border-edge shadow-xl space-y-3 overflow-hidden transition-colors">
               <div className="absolute -top-2 left-10 w-24 h-5 washi-tape-buttercup rounded-sm pointer-events-none" />
 
               <div className="space-y-1">
-                <h3 className="text-base font-serif font-bold text-[#2C1E16] dark:text-[#FFF8F0]">
+                <h3 className="text-base font-serif font-bold text-ink">
                   {t("profile.publicUrl.title")}
                 </h3>
-                <p className="text-xs text-[#7C7069] dark:text-[#A8988B] leading-relaxed">
+                <p className="text-xs text-ink-muted leading-relaxed">
                   {t("profile.publicUrl.helper")}
                 </p>
               </div>
@@ -382,7 +389,7 @@ export default function ProfilePage() {
             </div>
 
             {/* 5. Bottom Action Controls Section (Passcode Info & Disconnect Mailbox) */}
-            <div className="p-6 sm:p-7 rounded-3xl bg-[#FFFDF9] dark:bg-[#170A24] border border-[#F0E2D2] dark:border-[#351D4D] shadow-xl space-y-4 transition-colors">
+            <div className="p-6 sm:p-7 rounded-3xl bg-surface border border-edge shadow-xl space-y-4 transition-colors">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Secondary Action 1: 6-Digit Passcode Info Modal */}
                 <Button
@@ -390,9 +397,9 @@ export default function ProfilePage() {
                   variant="outline"
                   size="lg"
                   onClick={() => setIsPasscodeModalOpen(true)}
-                  className="w-full rounded-full border-[#F0E2D2] dark:border-[#351D4D] hover:bg-[#FAF7F2] dark:hover:bg-[#1E0F2E] text-[#2C1E16] dark:text-[#FFF8F0] gap-2 text-xs sm:text-sm font-medium cursor-pointer"
+                  className="w-full rounded-full border-edge hover:bg-canvas text-ink gap-2 text-xs sm:text-sm font-medium cursor-pointer"
                 >
-                  <KeyRound size={16} className="text-[#E88B60]" />
+                  <KeyRound size={16} className="text-wax" />
                   <span>{t("profile.actions.passcodeInfo")}</span>
                 </Button>
 
@@ -402,7 +409,7 @@ export default function ProfilePage() {
                   variant="secondary"
                   size="lg"
                   onClick={() => setIsDisconnectModalOpen(true)}
-                  className="w-full rounded-full bg-[#FAF7F2] dark:bg-[#1E0F2E] hover:bg-[#EBE3D5] dark:hover:bg-[#2B143D] text-[#D9534F] border border-[#F0E2D2] dark:border-[#351D4D] gap-2 text-xs sm:text-sm font-medium cursor-pointer"
+                  className="w-full rounded-full bg-canvas hover:bg-edge text-wax border border-edge gap-2 text-xs sm:text-sm font-medium cursor-pointer"
                 >
                   <LogOut size={16} strokeWidth={1.5} />
                   <span>{t("profile.actions.disconnect")}</span>
@@ -427,17 +434,17 @@ export default function ProfilePage() {
       >
         <div className="space-y-4 text-left p-1">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] border border-[#FCA5A5] flex items-center justify-center text-[#D9534F] shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-danger/10 border border-danger/20 flex items-center justify-center text-wax shadow-sm">
               <LogOut size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-serif font-bold text-[#2D2522]">
+              <h3 className="text-lg font-serif font-bold text-ink">
                 {t("profile.actions.disconnectConfirm")}
               </h3>
             </div>
           </div>
 
-          <p className="text-xs sm:text-sm text-[#7C7069] leading-relaxed">
+          <p className="text-xs sm:text-sm text-ink-muted leading-relaxed">
             {t("profile.actions.disconnectDesc")}
           </p>
 
@@ -447,7 +454,7 @@ export default function ProfilePage() {
               variant="outline"
               size="md"
               onClick={() => setIsDisconnectModalOpen(false)}
-              className="rounded-full border-[#EBE3D5] text-[#7C7069] cursor-pointer"
+              className="rounded-full border-edge text-ink-muted cursor-pointer"
             >
               {t("profile.actions.cancelBtn")}
             </Button>
@@ -456,7 +463,7 @@ export default function ProfilePage() {
               variant="primary"
               size="md"
               onClick={handleDisconnect}
-              className="rounded-full bg-[#D9534F] hover:bg-[#C2433F] text-white cursor-pointer"
+              className="rounded-full bg-wax hover:bg-wax-pressed text-white cursor-pointer"
             >
               {t("profile.actions.confirmBtn")}
             </Button>

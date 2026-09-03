@@ -18,7 +18,7 @@ export default function FeedPage() {
 
   const [activeTab, setActiveTab] = useState<"trending" | "latest">("trending");
   const [items, setItems] = useState<FeedItemWithViewer[]>([]);
-  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -26,12 +26,13 @@ export default function FeedPage() {
   const [reportTargetId, setReportTargetId] = useState<string | null>(null);
 
   const fetchFeed = useCallback(
-    async (tab: "trending" | "latest", cursor = 0, append = false) => {
+    async (tab: "trending" | "latest", cursor?: string | null, append = false) => {
       if (!append) setIsLoading(true);
       else setIsLoadingMore(true);
 
       try {
-        const res = await fetch(`/api/feed?tab=${tab}&cursor=${cursor}`);
+        const query = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+        const res = await fetch(`/api/feed?tab=${tab}${query}`);
         const json = await res.json();
 
         if (json.ok) {
@@ -56,7 +57,7 @@ export default function FeedPage() {
   );
 
   useEffect(() => {
-    fetchFeed(activeTab, 0, false);
+    fetchFeed(activeTab, null, false);
   }, [activeTab, fetchFeed]);
 
   const handleReact = async (
@@ -86,19 +87,19 @@ export default function FeedPage() {
     <PageShell>
       <div className="space-y-8">
         {/* Wall Header */}
-        <div className="border-b border-[#EBE3D5] dark:border-[#351D4D] pb-6 space-y-2">
+        <div className="border-b border-edge pb-6 space-y-2">
           <Badge variant="buttercup">{t("feed.badge")}</Badge>
 
           <div className="flex items-baseline gap-3">
-            <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#2D2522] dark:text-[#FFF8F0]">
+            <h1 className="text-3xl sm:text-4xl font-serif font-bold text-ink">
               {t("feed.title")}
             </h1>
-            <span className="text-xl sm:text-2xl font-serif text-[#D9534F] font-normal">
+            <span className="text-xl sm:text-2xl font-serif text-wax font-normal">
               {t("feed.nativeTitle")}
             </span>
           </div>
 
-          <p className="text-sm text-[#7C7069] dark:text-[#A592A4] max-w-xl leading-relaxed">
+          <p className="text-sm text-ink-muted max-w-xl leading-relaxed">
             {t("feed.subtitle")}
           </p>
         </div>

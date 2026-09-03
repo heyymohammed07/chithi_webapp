@@ -1,22 +1,23 @@
 import { SendBottleInput } from "./schemas";
 import { MailboxRecord, LetterRecord, PaperStyleId, StampId } from "./types";
-import { MAILBOX_LETTER_CAP, SEVEN_DAYS_MS } from "./constants";
+import { MAILBOX_LETTER_CAP } from "./constants";
 import { keys } from "./keys";
 import { getRedis } from "./redis";
 import { generateLetterId } from "./ids";
-import { toPlainText, hasExcessivelyLongWord } from "./sanitize";
+import { toPlainText, hasExcessivelyLongWord, sanitizeSenderName } from "./sanitize";
 import { ApiError } from "./api";
-import { purgeInactiveMailbox } from "./mailbox";
-import { publishDirectToFeed } from "./feed";
+import { remainingTtlSeconds } from "./mailbox";
+import { DELIVER_BOTTLE_SCRIPT } from "./scripts";
 
 /**
- * Matches an active, eligible mailbox recipient for a Message in a Bottle.
+ * Matches an active, eligible candidate recipient and their mailbox record (§COR-07).
+ * Does NOT consume the 24h pair guard until delivery is atomic.
  */
-export async function selectBottleRecipient(
+export async function selectBottleCandidate(
   target: "anyone" | "male" | "female",
   senderViewerHash: string,
   senderUsernameLower?: string
-): Promise<string> {
+): Promise<{ recipient: string; mailbox: MailboxRecord }> {
   const redis = getRedis();
   const poolKey =
     target === "anyone"
@@ -34,8 +35,8 @@ export async function selectBottleRecipient(
     throw new ApiError("BOTTLE_NO_MATCH", "errors.bottleNoMatch", 409);
   }
 
-  // 3. Retry matching up to 5 times
-  for (let attempt = 0; attempt < 5; attempt++) {
+  // 3. Retry matching up to 10 times across available candidates
+  for (let attempt = 0; attempt < 10; attempt++) {
     const randomIndex = Math.floor(Math.random() * card);
     const candidateArray = await redis.zrange(poolKey, randomIndex, randomIndex);
     const candidate = candidateArray[0];
@@ -57,13 +58,6 @@ export async function selectBottleRecipient(
     const mailbox: MailboxRecord =
       typeof rawMailbox === "string" ? JSON.parse(rawMailbox) : rawMailbox;
 
-    const lastActive = mailbox.lastLoginAt ?? mailbox.createdAt;
-    if (now - lastActive > SEVEN_DAYS_MS) {
-      await purgeInactiveMailbox(candidate);
-      await redis.zrem(poolKey, candidate);
-      continue;
-    }
-
     if (now > mailbox.expiresAt || !mailbox.acceptsBottles) {
       await redis.zrem(poolKey, candidate);
       continue;
@@ -75,21 +69,33 @@ export async function selectBottleRecipient(
       continue;
     }
 
-    // 24h pair delivery guard (§12)
+    // Verify pair key not already held (§COR-07: check only, do not acquire yet)
     const pairKey = keys.bottlePair(senderViewerHash, candidate);
-    const acquired = await redis.set(pairKey, "1", { nx: true, ex: 86400 });
-    if (!acquired) {
+    const alreadyPaired = await redis.get(pairKey);
+    if (alreadyPaired) {
       continue;
     }
 
-    return candidate;
+    return { recipient: candidate, mailbox };
   }
 
   throw new ApiError("BOTTLE_NO_MATCH", "errors.bottleNoMatch", 409);
 }
 
 /**
- * Sends an anonymous message in a bottle.
+ * Backward-compatible wrapper returning recipient username string.
+ */
+export async function selectBottleRecipient(
+  target: "anyone" | "male" | "female",
+  senderViewerHash: string,
+  senderUsernameLower?: string
+): Promise<string> {
+  const result = await selectBottleCandidate(target, senderViewerHash, senderUsernameLower);
+  return result.recipient;
+}
+
+/**
+ * Sends an anonymous message in a bottle with atomic delivery and pair reservation (§COR-06, §COR-07).
  */
 export async function sendBottle(
   input: SendBottleInput,
@@ -115,66 +121,66 @@ export async function sendBottle(
     }
   }
 
-  // Find random matching recipient
-  const recipient = await selectBottleRecipient(
-    input.target,
-    senderViewerHash,
-    senderUsernameLower
-  );
+  // Retry candidate selection and atomic delivery up to 3 times in case of pair collisions
+  for (let deliveryAttempt = 0; deliveryAttempt < 3; deliveryAttempt++) {
+    const { recipient, mailbox } = await selectBottleCandidate(
+      input.target,
+      senderViewerHash,
+      senderUsernameLower
+    );
 
-  const rawMailbox = await redis.get<string | MailboxRecord>(keys.mailbox(recipient));
-  if (!rawMailbox) {
-    throw new ApiError("BOTTLE_NO_MATCH", "errors.bottleNoMatch", 409);
-  }
+    const now = Date.now();
+    const remainingSeconds = remainingTtlSeconds(mailbox);
+    const letterId = generateLetterId();
 
-  const mailbox: MailboxRecord =
-    typeof rawMailbox === "string" ? JSON.parse(rawMailbox) : rawMailbox;
+    const letterRecord: LetterRecord = {
+      id: letterId,
+      recipient,
+      body: cleanBody,
+      paper: input.paper as PaperStyleId,
+      stamp: input.stamp as StampId,
+      hints: cleanHints,
+      source: "bottle",
+      createdAt: now,
+      lock: { kind: "none" },
+      burnAfterReading: false,
+      openedAt: null,
+      burnAt: null,
+      reaction: null,
+      published: false,
+      senderName: input.isAnonymous ? null : (sanitizeSenderName(input.senderName ?? "", 40) || null),
+      version: 1,
+    };
 
-  const now = Date.now();
-  const remainingSeconds = Math.max(1, Math.floor((mailbox.expiresAt - now) / 1000));
-  const letterId = generateLetterId();
+    const pairKey = keys.bottlePair(senderViewerHash, recipient);
+    let delivered = false;
 
-  // Bottle letters never have riddle or capsule locks per §12
-  const letterRecord: LetterRecord = {
-    id: letterId,
-    recipient,
-    body: cleanBody,
-    paper: input.paper as PaperStyleId,
-    stamp: input.stamp as StampId,
-    hints: cleanHints,
-    source: "bottle",
-    createdAt: now,
-    lock: { kind: "none" },
-    burnAfterReading: false,
-    openedAt: null,
-    burnAt: null,
-    reaction: null,
-    published: false,
-    attachedSong: input.attachedSong,
-    senderName: input.isAnonymous ? null : (input.senderName?.trim() || null),
-    version: 1,
-  };
-
-  const pipeline = redis.pipeline();
-  pipeline.set(keys.letter(letterId), JSON.stringify(letterRecord), {
-    ex: remainingSeconds,
-  });
-  pipeline.zadd(keys.mailboxLetters(recipient), {
-    score: now,
-    member: letterId,
-  });
-  pipeline.expire(keys.mailboxLetters(recipient), remainingSeconds);
-  pipeline.incr(keys.mailboxUnread(recipient));
-
-  await pipeline.exec();
-
-  if (input.isPublic) {
     try {
-      await publishDirectToFeed(cleanBody, input.paper as PaperStyleId, input.stamp as StampId);
+      // Execute atomic DELIVER_BOTTLE_SCRIPT (§COR-07)
+      const res = await redis.eval<number>(
+        DELIVER_BOTTLE_SCRIPT,
+        [
+          pairKey,
+          keys.letter(letterId),
+          keys.mailboxLetters(recipient),
+          keys.mailboxUnread(recipient),
+        ],
+        [JSON.stringify(letterRecord), letterId, now, remainingSeconds]
+      );
+
+      if (res === 1) {
+        delivered = true;
+        return { delivered: true };
+      }
+      // If pair acquisition failed, loop and try next candidate
     } catch (err) {
-      console.warn("[sendBottle] Failed to publish public feed item", err);
+      // If delivery failed with an unexpected error, clean up the pairKey if it was acquired
+      if (!delivered) {
+        await redis.del(pairKey).catch(() => {});
+      }
+      throw err;
     }
   }
 
-  return { delivered: true };
+  throw new ApiError("BOTTLE_NO_MATCH", "errors.bottleNoMatch", 409);
 }

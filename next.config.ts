@@ -1,17 +1,22 @@
 import type { NextConfig } from "next";
 
+const isProduction = process.env.NODE_ENV === "production";
+const scriptSrc = isProduction
+  ? "script-src 'self' 'unsafe-inline';"
+  : "script-src 'self' 'unsafe-eval' 'unsafe-inline';";
+
 const cspHeader = `
   default-src 'self';
-  script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com;
+  ${scriptSrc}
   style-src 'self' 'unsafe-inline';
-  img-src 'self' data: blob: https://*.ytimg.com https://i.ytimg.com https://img.youtube.com;
+  img-src 'self' data: blob:;
   font-src 'self' data:;
-  connect-src 'self' https://*.upstash.io https://www.youtube.com https://*.youtube.com https://*.googlevideo.com;
-  media-src 'self' blob: data: https://*.googlevideo.com;
-  frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;
+  connect-src 'self' https://*.upstash.io;
   frame-ancestors 'none';
   object-src 'none';
   base-uri 'self';
+  form-action 'self';
+  worker-src 'self' blob:;
 `.replace(/\s{2,}/g, " ").trim();
 
 const nextConfig: NextConfig = {
@@ -19,23 +24,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   devIndicators: false,
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "i.ytimg.com",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "img.youtube.com",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "*.ytimg.com",
-        pathname: "/**",
-      },
-    ],
+    remotePatterns: [],
   },
   async headers() {
     const headers = [
@@ -84,7 +73,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/u/:path*",
+        source: "/profile",
         headers: [
           ...headers,
           {

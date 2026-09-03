@@ -18,6 +18,7 @@ export const fraunces = Fraunces({
   variable: "--font-display",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "serif"],
 });
 
 // UI Body & Buttons: Plus Jakarta Sans (warm, clean, modern feel)
@@ -27,6 +28,7 @@ export const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-ui",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "sans-serif"],
 });
 
 // Bengali UI Fallback
@@ -36,6 +38,7 @@ export const hindSiliguri = Hind_Siliguri({
   variable: "--font-bn-ui",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Noto Serif Bengali", "sans-serif"],
 });
 
 // Bengali Book Print / Classic Serif Fallback
@@ -45,6 +48,7 @@ export const notoSerifBengali = Noto_Serif_Bengali({
   variable: "--font-bn-paper",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Hind Siliguri", "serif"],
 });
 
 // English Cursive & Handwriting
@@ -54,6 +58,7 @@ export const caveat = Caveat({
   variable: "--font-hand",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "cursive", "sans-serif"],
 });
 
 export const dancingScript = Dancing_Script({
@@ -62,6 +67,7 @@ export const dancingScript = Dancing_Script({
   variable: "--font-calligraphy",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "cursive", "sans-serif"],
 });
 
 export const homemadeApple = Homemade_Apple({
@@ -70,6 +76,7 @@ export const homemadeApple = Homemade_Apple({
   variable: "--font-pencil",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "cursive", "sans-serif"],
 });
 
 export const courierPrime = Courier_Prime({
@@ -78,6 +85,7 @@ export const courierPrime = Courier_Prime({
   variable: "--font-mono-paper",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "monospace"],
 });
 
 export const specialElite = Special_Elite({
@@ -86,6 +94,7 @@ export const specialElite = Special_Elite({
   variable: "--font-typewriter",
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "monospace"],
 });
 
 // Local Bengali Handwriting Fonts
@@ -93,21 +102,21 @@ export const bnHandwriting1 = localFont({
   src: "../../public/fonts/bensen-handwriting.ttf",
   variable: "--font-bn-hand-1",
   display: "swap",
-  fallback: ["Noto Serif Bengali", "serif"],
+  fallback: ["Noto Serif Bengali", "Hind Siliguri", "serif"],
 });
 
 export const bnHandwriting2 = localFont({
   src: "../../public/fonts/kornofuli-handwriting.ttf",
   variable: "--font-bn-hand-2",
   display: "swap",
-  fallback: ["Hind Siliguri", "sans-serif"],
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "sans-serif"],
 });
 
 export const bnHandwriting3 = localFont({
   src: "../../public/fonts/solpic-handwriting.ttf",
   variable: "--font-bn-hand-3",
   display: "swap",
-  fallback: ["Hind Siliguri", "cursive", "sans-serif"],
+  fallback: ["Hind Siliguri", "Noto Serif Bengali", "cursive", "sans-serif"],
 });
 
 export const fontVariables = `${fraunces.variable} ${plusJakartaSans.variable} ${hindSiliguri.variable} ${notoSerifBengali.variable} ${caveat.variable} ${dancingScript.variable} ${homemadeApple.variable} ${courierPrime.variable} ${specialElite.variable} ${bnHandwriting1.variable} ${bnHandwriting2.variable} ${bnHandwriting3.variable}`;
