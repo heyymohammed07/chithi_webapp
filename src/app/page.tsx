@@ -255,10 +255,8 @@ export default function HomePage() {
            ========================================================================= */}
         {isAuthenticated && activeUser && !createdMailbox ? (
           <section className="pt-4 md:pt-8 space-y-8">
-            {/* 1. Welcoming Banner Card with Washi Tape */}
+            {/* 1. Welcoming Banner Card */}
             <div className="relative p-6 sm:p-10 rounded-3xl bg-surface border border-edge shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] overflow-hidden transition-colors">
-              <div className="absolute -top-3 right-8 w-28 h-6 washi-tape-lavender rounded-sm pointer-events-none" />
-
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-2">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-medium bg-success-surface text-success border border-success-edge">

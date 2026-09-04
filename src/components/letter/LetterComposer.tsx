@@ -466,21 +466,6 @@ export function LetterComposer({
           </Button>
         </div>
       </div>
-
-      {/* Floating Action Bar (Mobile only) */}
-      <div className="md:hidden fixed bottom-4 left-0 right-0 z-40 px-4 max-w-lg mx-auto pointer-events-none">
-        <div className="p-2 rounded-full bg-surface/90 border border-edge/80 backdrop-blur-md shadow-2xl">
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            className="w-full text-base py-3 rounded-full pointer-events-auto shadow-md cursor-pointer"
-            isLoading={isSending}
-          >
-            {isBottleMode ? t("bottle.sendButton") : t("composer.sendButton")}
-          </Button>
-        </div>
-      </div>
     </form>
   );
 }

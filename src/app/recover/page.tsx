@@ -141,7 +141,7 @@ function RecoverForm() {
           </p>
         </div>
 
-        <div className="border border-edge rounded-2xl sm:rounded-3xl bg-surface p-6 sm:p-8 shadow-xl relative">
+        <div className="border border-edge rounded-2xl sm:rounded-3xl bg-surface p-4 sm:p-8 shadow-xl relative">
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
@@ -176,7 +176,7 @@ function RecoverForm() {
               <span id="passcode-label" className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
                 {t("recover.passcodeLabel")}
               </span>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-1.5 sm:gap-2.5">
                 {digits.map((digit, idx) => (
                   <input
                     key={idx}
@@ -193,7 +193,7 @@ function RecoverForm() {
                     onChange={(e) => handleDigitChange(idx, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(idx, e)}
                     onPaste={handlePaste}
-                    className="w-12 h-14 text-center font-mono text-xl font-bold bg-surface text-ink border border-edge rounded-2xl focus:outline-none focus:border-wax focus:ring-1 focus:ring-wax transition-all"
+                    className="flex-1 min-w-0 max-w-[48px] h-12 sm:h-14 text-center font-mono text-lg sm:text-xl font-bold bg-surface text-ink border border-edge rounded-xl sm:rounded-2xl focus:outline-none focus:border-wax focus:ring-1 focus:ring-wax transition-all"
                   />
                 ))}
               </div>
