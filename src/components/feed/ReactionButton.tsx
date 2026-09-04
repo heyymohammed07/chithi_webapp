@@ -27,6 +27,7 @@ export function ReactionButton({
   return (
     <button
       type="button"
+      data-testid={`feed-reaction-${type}`}
       onClick={onClick}
       disabled={disabled}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono tracking-wider border transition-colors select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-wax focus-visible:outline-offset-2 ${

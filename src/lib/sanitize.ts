@@ -1,6 +1,6 @@
 import sanitizeHtml from "sanitize-html";
 import { LETTER_BODY_MAX } from "./constants";
-import { ApiError } from "./api";
+import { ApiError } from "./types";
 
 // Matches explicit schemes (http, https, ftp), protocol-relative (//), and www. hosts
 const SCHEME_REGEX = /(?:https?:\/\/|ftp:\/\/|\/\/)[^\s]+|\bwww\.[a-zA-Z0-9-]+\.[^\s]+/gi;

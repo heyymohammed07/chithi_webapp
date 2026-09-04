@@ -169,6 +169,18 @@ export interface ApiErr {
   };
 }
 
+export class ApiError extends Error {
+  constructor(
+    public code: ErrorCode,
+    public messageKey: string,
+    public status: number,
+    public details?: Record<string, string[]>
+  ) {
+    super(messageKey);
+    this.name = "ApiError";
+  }
+}
+
 export type ApiResponse<T> = ApiOk<T> | ApiErr;
 
 export type Locale = "en" | "bn";

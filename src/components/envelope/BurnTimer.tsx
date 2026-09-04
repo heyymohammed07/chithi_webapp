@@ -40,7 +40,7 @@ export function BurnTimer({ burnAt, onBurned }: BurnTimerProps) {
   return (
     <div className="w-full space-y-2 select-none">
       {/* Progress hairline draining across the top (§11.4) */}
-      <div className="w-full h-1 bg-ink-hairline overflow-hidden rounded-full">
+      <div className="w-full h-1 bg-edge overflow-hidden rounded-full">
         <div
           className="h-full bg-wax transition-all duration-200 ease-linear"
           style={{ width: `${progressPercent}%` }}

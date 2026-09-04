@@ -20,10 +20,10 @@ export function Tooltip({ content, children }: TooltipProps) {
       {isVisible && (
         <div
           role="tooltip"
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-xs text-ivory bg-ink-raised border border-ink-hairline rounded-input shadow-modal whitespace-nowrap z-40 pointer-events-none"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-xs font-mono text-canvas dark:text-ink bg-ink dark:bg-surface-raised border border-edge/60 rounded-xl shadow-lg whitespace-nowrap z-40 pointer-events-none"
         >
           {content}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-ink-hairline" />
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-ink dark:border-t-surface-raised" />
         </div>
       )}
     </div>

@@ -105,40 +105,16 @@ export default function InboxPage(props: {
   const { download: downloadPostcard } = useDownloadPostcard(postcardCanvasRef);
   const [postcardLetter, setPostcardLetter] = useState<LetterRecord | OpenLetter | null>(null);
 
-  // 1. URL key exchange and token stripping per SEC-01
-  useEffect(() => {
-    const keyParam = searchParams.get("key");
-    if (keyParam) {
-      fetch("/api/session/exchange", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, key: keyParam }),
-      })
-        .then((res) => res.json())
-        .then(async (json) => {
-          if (json.ok) {
-            await refreshSession();
-          }
-        })
-        .catch((err) => console.error("Session exchange error:", err));
-
-      saveToken(keyParam);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("chithi:active", usernameLower);
-      }
-      // Strip key from URL to prevent Referer leaks per SEC-01
-      router.replace(pathname, { scroll: false });
-    }
-  }, [searchParams, username, usernameLower, saveToken, router, pathname, refreshSession]);
-
-  // 2. Load inbox data
+  // 1. Load inbox data
   const loadInbox = useCallback(async () => {
     if (!isTokenLoaded) return;
 
     try {
-      // 1. Prepare auth headers
+      // 1. Prepare auth headers (check state, URL param, or localStorage)
+      const keyParam = searchParams.get("key");
       const storedToken =
         token ||
+        keyParam ||
         (typeof window !== "undefined"
           ? localStorage.getItem(`chithi:token:${usernameLower}`)
           : null);
@@ -199,7 +175,35 @@ export default function InboxPage(props: {
     } finally {
       setIsLoading(false);
     }
-  }, [isTokenLoaded, usernameLower, token]);
+  }, [isTokenLoaded, usernameLower, token, searchParams]);
+
+  // 2. URL key exchange and token stripping per SEC-01
+  useEffect(() => {
+    const keyParam = searchParams.get("key");
+    if (keyParam) {
+      saveToken(keyParam);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`chithi:token:${usernameLower}`, keyParam);
+        localStorage.setItem("chithi:active", usernameLower);
+      }
+      fetch("/api/session/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, key: keyParam }),
+      })
+        .then((res) => res.json())
+        .then(async (json) => {
+          if (json.ok) {
+            await refreshSession();
+            loadInbox();
+          }
+        })
+        .catch((err) => console.error("Session exchange error:", err));
+
+      // Strip key from URL to prevent Referer leaks per SEC-01
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, username, usernameLower, saveToken, router, pathname, refreshSession, loadInbox]);
 
   const handleLoadMore = useCallback(async () => {
     if (nextCursor === null || isLoadingMore) return;
@@ -325,17 +329,33 @@ export default function InboxPage(props: {
   };
 
   const handleDeleteLetter = async (letterId: string) => {
+    const storedToken =
+      token ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem(`chithi:token:${usernameLower}`)
+        : null);
+    const headers: Record<string, string> = {};
+    if (storedToken) headers["Authorization"] = `Bearer ${storedToken}`;
+
     await fetch(`/api/letters/${letterId}?username=${encodeURIComponent(usernameLower)}`, {
       method: "DELETE",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers,
     });
     setLetters((prev) => prev.filter((l) => l.id !== letterId));
   };
 
   const handlePublishLetter = async (letterId: string) => {
+    const storedToken =
+      token ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem(`chithi:token:${usernameLower}`)
+        : null);
+    const headers: Record<string, string> = {};
+    if (storedToken) headers["Authorization"] = `Bearer ${storedToken}`;
+
     const res = await fetch(`/api/letters/${letterId}/publish?username=${encodeURIComponent(usernameLower)}`, {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers,
     });
     const json = await res.json();
     if (!json.ok) {
@@ -350,12 +370,19 @@ export default function InboxPage(props: {
     letterId: string,
     reaction: "heart" | "heartCrack"
   ) => {
+    const storedToken =
+      token ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem(`chithi:token:${usernameLower}`)
+        : null);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (storedToken) headers["Authorization"] = `Bearer ${storedToken}`;
+
     await fetch(`/api/letters/${letterId}/react?username=${encodeURIComponent(usernameLower)}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers,
       body: JSON.stringify({ reaction }),
     });
 
@@ -372,7 +399,7 @@ export default function InboxPage(props: {
       <PageShell>
         <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
           <Spinner size={32} />
-          <p className="text-xs font-serif italic text-ash">
+          <p className="text-xs font-serif italic text-ink-muted">
             Opening your mailbox...
           </p>
         </div>
@@ -426,7 +453,7 @@ export default function InboxPage(props: {
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/recover" className="w-full sm:w-auto">
               <Button variant="primary" className="w-full rounded-full">
-                {t("inbox.usePasscode")}
+                {t("inbox.recoverAction")}
               </Button>
             </Link>
             <Link href="/" className="w-full sm:w-auto">

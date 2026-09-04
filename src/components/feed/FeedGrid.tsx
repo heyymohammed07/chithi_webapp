@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react";
-import { FeedItemWithViewer } from "@/lib/feed";
+import type { FeedItemWithViewer } from "@/lib/feed";
 import { FeedCard } from "./FeedCard";
 import { Skeleton } from "../ui/Skeleton";
 import { EmptyState } from "../ui/EmptyState";
@@ -35,7 +34,7 @@ export function FeedGrid({
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="break-inside-avoid rounded-card border border-ink-hairline bg-ink-raised p-5 space-y-4"
+            className="break-inside-avoid rounded-3xl border border-edge bg-surface p-5 space-y-4 shadow-sm"
           >
             <Skeleton className="h-4 w-1/3" />
             <Skeleton className="h-28 w-full" />

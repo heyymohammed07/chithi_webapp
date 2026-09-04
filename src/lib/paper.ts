@@ -215,7 +215,7 @@ export const PAPERS: Record<PaperStyleId, PaperDefinition> = {
     defaultFont: "bnCursive",
     inkColor: PAPER_COLORS.midnight.ink,
     baseColor: PAPER_COLORS.midnight.base,
-    previewSwatch: "bg-ink-raised border-edge",
+    previewSwatch: "bg-surface-raised border-edge",
   },
   rose: {
     id: "rose",

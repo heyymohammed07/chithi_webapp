@@ -77,29 +77,29 @@ export function ReportDialog({
       title={t("report.dialogTitle")}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
-        <p className="text-xs text-ash leading-relaxed">
+        <p className="text-xs text-ink-muted leading-relaxed">
           {t("report.dialogDesc")}
         </p>
 
         {/* Reason Selector */}
         <div className="space-y-2">
-          <label className="block text-xs font-mono uppercase tracking-wider text-ash">
+          <label className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
             {t("report.reasonLabel")}
           </label>
           <div className="space-y-1.5">
             {reasonOptions.map((opt) => (
               <label
                 key={opt.id}
-                className="flex items-center gap-3 p-2 rounded-input hover:bg-ink cursor-pointer border border-transparent hover:border-ink-hairline transition-colors"
+                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-raised cursor-pointer border border-transparent hover:border-edge transition-colors"
               >
                 <input
                   type="radio"
                   name="reportReason"
                   checked={reason === opt.id}
                   onChange={() => setReason(opt.id)}
-                  className="text-wax focus:ring-gold"
+                  className="text-wax focus:ring-wax accent-wax"
                 />
-                <span className="text-xs text-ivory">{opt.label}</span>
+                <span className="text-xs font-medium text-ink">{opt.label}</span>
               </label>
             ))}
           </div>
@@ -107,7 +107,7 @@ export function ReportDialog({
 
         {/* Note Textarea */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-mono uppercase tracking-wider text-ash">
+          <label className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
             {t("report.noteLabel")}
           </label>
           <Textarea
@@ -119,7 +119,7 @@ export function ReportDialog({
           />
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-2 border-t border-ink-hairline">
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-edge">
           <Button
             type="button"
             variant="ghost"

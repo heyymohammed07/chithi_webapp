@@ -150,7 +150,7 @@ export async function listFeedItems(
     }
 
     // Fetch entries with scores
-    const rawEntries = await redis.zrange<{ member: string; score: number }>(
+    const rawEntries = await redis.zrange<any>(
       keys.feedTrending(),
       minScoreBound === "+inf" ? "+inf" : minScoreBound,
       "-inf",
@@ -163,9 +163,31 @@ export async function listFeedItems(
       }
     );
 
+    // Normalize entries: Upstash Redis returns [member, score, member, score, ...]
+    // whereas InMemoryRedisShim returns [{ member, score }, ...]
+    const parsedEntries: Array<{ member: string; score: number }> = [];
+    if (Array.isArray(rawEntries)) {
+      if (
+        rawEntries.length > 0 &&
+        typeof rawEntries[0] === "object" &&
+        rawEntries[0] !== null &&
+        "member" in rawEntries[0]
+      ) {
+        parsedEntries.push(...(rawEntries as unknown as Array<{ member: string; score: number }>));
+      } else {
+        for (let i = 0; i < rawEntries.length; i += 2) {
+          const member = String(rawEntries[i]);
+          const score = Number(rawEntries[i + 1]);
+          if (member && !isNaN(score)) {
+            parsedEntries.push({ member, score });
+          }
+        }
+      }
+    }
+
     let startIndex = 0;
     if (lastSeenMember && minScoreBound !== "+inf") {
-      const idx = rawEntries.findIndex(
+      const idx = parsedEntries.findIndex(
         (e) => e.member === lastSeenMember && e.score === Number(minScoreBound)
       );
       if (idx !== -1) {
@@ -173,7 +195,7 @@ export async function listFeedItems(
       }
     }
 
-    const pageEntries = rawEntries.slice(startIndex, startIndex + FEED_PAGE_SIZE);
+    const pageEntries = parsedEntries.slice(startIndex, startIndex + FEED_PAGE_SIZE);
     feedIds = pageEntries.map((e) => e.member);
 
     if (pageEntries.length === FEED_PAGE_SIZE) {

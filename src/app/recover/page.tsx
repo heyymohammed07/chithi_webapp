@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageShell } from "@/components/layout/PageShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -12,18 +12,27 @@ import { useSession } from "@/hooks/useSession";
 import { KeyRound, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-export default function RecoverPage() {
+function RecoverForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLocale();
   const { showToast } = useToast();
   const { refresh } = useSession();
 
+  const queryUsername = searchParams?.get("username") || "";
+
   const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(queryUsername);
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (queryUsername && !username) {
+      setUsername(queryUsername);
+    }
+  }, [queryUsername, username]);
 
   const { saveToken } = useAccessToken(username);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -217,5 +226,23 @@ export default function RecoverPage() {
         </div>
       </div>
     </PageShell>
+  );
+}
+
+export default function RecoverPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell>
+          <div className="max-w-md mx-auto py-12 space-y-6 animate-pulse text-center">
+            <div className="w-12 h-12 rounded-2xl bg-surface border border-edge mx-auto mb-3" />
+            <div className="h-6 w-48 bg-surface rounded-full mx-auto" />
+            <div className="h-4 w-64 bg-surface rounded-full mx-auto" />
+          </div>
+        </PageShell>
+      }
+    >
+      <RecoverForm />
+    </Suspense>
   );
 }

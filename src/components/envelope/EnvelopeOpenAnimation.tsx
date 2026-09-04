@@ -32,7 +32,7 @@ export function EnvelopeOpenAnimation({
         initial={{ y: 0, scale: 0.95 }}
         animate={{ y: -4, scale: 1 }}
         transition={{ duration: MOTION.duration.envelope, ease: MOTION.ease }}
-        className="relative w-80 h-52 bg-ink-raised border border-ink-hairline rounded-envelope shadow-modal overflow-visible flex items-center justify-center"
+        className="relative w-80 h-52 bg-surface border border-edge rounded-envelope shadow-modal overflow-visible flex items-center justify-center"
         style={{ perspective: 1000 }}
       >
         {/* Flap rotating open 0 to -170deg */}
@@ -48,7 +48,7 @@ export function EnvelopeOpenAnimation({
             transformOrigin: "top center",
             transformStyle: "preserve-3d",
           }}
-          className="absolute top-0 left-0 right-0 h-28 bg-ink border-b border-ink-hairline z-20"
+          className="absolute top-0 left-0 right-0 h-28 bg-surface-raised border-b border-edge z-20"
         />
 
         {/* Wax seal cracking apart */}
@@ -71,7 +71,7 @@ export function EnvelopeOpenAnimation({
             ease: MOTION.ease,
           }}
           onAnimationComplete={onAnimationComplete}
-          className="absolute inset-x-4 top-4 bottom-4 bg-ivory dark:bg-surface-raised border border-ink-hairline rounded-envelope z-10"
+          className="absolute inset-x-4 top-4 bottom-4 bg-ivory dark:bg-surface-raised border border-edge rounded-envelope z-10"
         />
       </motion.div>
     </div>

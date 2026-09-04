@@ -27,21 +27,21 @@ export function LetterActionBar({
   const { t } = useLocale();
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-ink-raised border border-ink-hairline rounded-card">
+    <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-surface border border-edge rounded-2xl shadow-sm">
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => onReact("heart")}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs font-medium border transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
             reaction === "heart"
               ? "bg-wax/20 border-wax text-wax"
-              : "border-transparent text-ash hover:text-ivory hover:bg-ink"
+              : "border-edge text-ink-muted hover:text-ink hover:bg-surface-raised"
           }`}
           title={t("reader.actionReact")}
         >
           <Heart
             size={16}
-            strokeWidth={1.25}
+            strokeWidth={1.5}
             className={reaction === "heart" ? "fill-wax" : ""}
           />
           <span>{reaction === "heart" ? t("reader.actionReacted") : t("reader.actionReact")}</span>
@@ -50,16 +50,16 @@ export function LetterActionBar({
         <button
           type="button"
           onClick={() => onReact("heartCrack")}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs font-medium border transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
             reaction === "heartCrack"
               ? "bg-wax/20 border-wax text-wax"
-              : "border-transparent text-ash hover:text-ivory hover:bg-ink"
+              : "border-edge text-ink-muted hover:text-ink hover:bg-surface-raised"
           }`}
           title="Heartbreak"
         >
           <HeartCrack
             size={16}
-            strokeWidth={1.25}
+            strokeWidth={1.5}
             className={reaction === "heartCrack" ? "fill-wax" : ""}
           />
         </button>

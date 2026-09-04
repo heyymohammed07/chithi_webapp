@@ -7,6 +7,7 @@ import "./globals.css";
 import { LocaleProvider } from "@/i18n/provider";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { SessionProvider } from "@/context/SessionContext";
+import { ToastProvider } from "@/hooks/useToast";
 import { GrainOverlay } from "@/components/layout/GrainOverlay";
 import { env } from "@/lib/env";
 import { Locale } from "@/i18n/types";
@@ -64,8 +65,10 @@ export default async function RootLayout({
         <ThemeProvider>
           <LocaleProvider initialLocale={initialLocale}>
             <SessionProvider>
-              <GrainOverlay />
-              {children}
+              <ToastProvider>
+                <GrainOverlay />
+                {children}
+              </ToastProvider>
             </SessionProvider>
           </LocaleProvider>
         </ThemeProvider>

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Flag } from "lucide-react";
-import { FeedItemWithViewer } from "@/lib/feed";
+import type { FeedItemWithViewer } from "@/lib/feed";
 import { PaperSurface } from "../letter/PaperSurface";
 import { ReactionButton } from "./ReactionButton";
 import { IconButton } from "../ui/IconButton";
@@ -46,7 +46,10 @@ export function FeedCard({ item, onReact, onReport }: FeedCardProps) {
 
   return (
     <>
-      <div className="break-inside-avoid mb-6 rounded-3xl border border-edge bg-canvas dark:bg-surface overflow-hidden shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] hover:shadow-md transition-all">
+      <div
+        data-testid="feed-card"
+        className="break-inside-avoid mb-6 rounded-3xl border border-edge bg-canvas dark:bg-surface overflow-hidden shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] hover:shadow-md transition-all"
+      >
         {/* Card Body - Clicking opens modal (§13) */}
         <div
           role="button"

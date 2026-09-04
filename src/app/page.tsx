@@ -64,6 +64,8 @@ export default function HomePage() {
   const [gender, setGender] = useState<Gender>("unspecified");
   const [availability, setAvailability] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [takenMailboxName, setTakenMailboxName] = useState<string | null>(null);
   const [createdMailbox, setCreatedMailbox] = useState<CreatedMailboxState | null>(null);
 
   // Send / Find Mailbox State (shared by both Guest Tab 2 and Authenticated Hub)
@@ -111,6 +113,7 @@ export default function HomePage() {
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setName(val);
+    setFormError(null);
     if (!isUsernameManuallyEdited) {
       const suggested = suggestUsernameFromName(val);
       setUsername(suggested);
@@ -119,6 +122,7 @@ export default function HomePage() {
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIsUsernameManuallyEdited(true);
+    setFormError(null);
     setUsername(e.target.value);
   };
 
@@ -150,17 +154,31 @@ export default function HomePage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    setTakenMailboxName(null);
 
-    if (!name.trim()) {
-      showToast(
-        locale === "bn" ? "অনুগ্রহ করে আপনার নাম লিখুন" : "Please enter your name",
-        "warn"
-      );
+    const trimmedName = name.trim();
+    const trimmedUsername = username.trim().toLowerCase();
+
+    if (!trimmedName) {
+      const msg = locale === "bn" ? "অনুগ্রহ করে আপনার নাম লিখুন" : "Please enter your name";
+      setFormError(msg);
+      showToast(msg, "warn");
+      return;
+    }
+
+    if (!trimmedUsername) {
+      const msg = locale === "bn" ? "অনুগ্রহ করে একটি ইউজারনেম দিন" : "Please choose a username";
+      setFormError(msg);
+      showToast(msg, "warn");
       return;
     }
 
     if (availability === "taken") {
-      showToast(t("home.usernameTaken"), "warn");
+      const takenMsg = t("home.usernameTaken");
+      setFormError(takenMsg);
+      setTakenMailboxName(trimmedUsername);
+      showToast(takenMsg, "warn");
       return;
     }
 
@@ -171,8 +189,8 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
-          username: username.trim(),
+          name: trimmedName,
+          username: trimmedUsername,
           durationKey,
           gender,
         }),
@@ -188,13 +206,32 @@ export default function HomePage() {
           localStorage.setItem("chithi:active", created.username.toLowerCase());
           sessionStorage.setItem(`chithi:passcode:${created.username.toLowerCase()}`, created.recoveryPasscode);
         }
-        await refreshSession();
+        refreshSession().catch(() => {});
         router.push(`/inbox/${created.username}?key=${encodeURIComponent(created.accessToken)}`);
       } else {
-        showToast(t(json.error?.message || "errors.generic"), "error");
+        if (res.status === 409 || json.error?.code === "USERNAME_TAKEN") {
+          setAvailability("taken");
+          setTakenMailboxName(trimmedUsername);
+          const errorText =
+            locale === "bn"
+              ? `"${trimmedUsername}" নামের ডাকবাক্সটি আগেই তৈরি করা হয়েছে।`
+              : `Mailbox "${trimmedUsername}" already exists.`;
+          setFormError(errorText);
+          showToast(errorText, "warn");
+        } else if (res.status === 429) {
+          const rateMsg = t("errors.rateLimited");
+          setFormError(rateMsg);
+          showToast(rateMsg, "error");
+        } else {
+          const genericMsg = t(json.error?.message || "errors.generic");
+          setFormError(genericMsg);
+          showToast(genericMsg, "error");
+        }
       }
     } catch {
-      showToast(t("errors.generic"), "error");
+      const genericMsg = t("errors.generic");
+      setFormError(genericMsg);
+      showToast(genericMsg, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -597,9 +634,17 @@ export default function HomePage() {
 
                           {/* Lifespan Segmented Options (12h, 24h, 3d, 7d) */}
                           <div className="space-y-2">
-                            <label className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
-                              {t("home.durationLabel")}
-                            </label>
+                            <div className="flex items-center justify-between">
+                              <label className="block text-xs font-mono uppercase tracking-wider text-ink-muted">
+                                {t("home.durationLabel")}
+                              </label>
+                              <span className="text-[11px] font-mono font-medium text-wax bg-warn-surface px-2.5 py-0.5 rounded-full border border-warn-edge">
+                                {durationKey === "12h" && (locale === "bn" ? "১২ ঘণ্টা" : "12 hours")}
+                                {durationKey === "24h" && (locale === "bn" ? "২৪ ঘণ্টা (১ দিন)" : "24 hours (1 day)")}
+                                {durationKey === "3d" && (locale === "bn" ? "৩ দিন (৭২ ঘণ্টা)" : "3 days (72 hours)")}
+                                {durationKey === "7d" && (locale === "bn" ? "৭ দিন (১ সপ্তাহ)" : "7 days (1 week)")}
+                              </span>
+                            </div>
                             <div className="grid grid-cols-4 gap-2">
                               {durationOptions.map((key) => {
                                 const isSelected = durationKey === key;
@@ -612,7 +657,7 @@ export default function HomePage() {
                                     key={key}
                                     type="button"
                                     onClick={() => setDurationKey(key)}
-                                    className={`py-2 px-1 text-center font-mono text-xs rounded-xl border transition-all select-none ${
+                                    className={`py-2 px-1 text-center font-mono text-xs rounded-xl border transition-all select-none cursor-pointer ${
                                       isSelected
                                         ? "bg-peach border-peach-hover text-peach-text ring-1 ring-peach-hover font-bold shadow-sm"
                                         : "bg-surface border-edge text-ink-muted hover:text-ink hover:border-peach-hover"
@@ -623,8 +668,23 @@ export default function HomePage() {
                                 );
                               })}
                             </div>
-                            <p className="text-[11px] text-ink-muted">
-                              {t("home.durationHelper")}
+                            <p className="text-[11px] text-ink-muted leading-relaxed">
+                              {durationKey === "12h" &&
+                                (locale === "bn"
+                                  ? "১২ ঘণ্টা পর এই ডাকবাক্স ও এর সমস্ত চিঠি চিরতরে স্বয়ংক্রিয়ভাবে মুছে যাবে।"
+                                  : "This mailbox and all letters will automatically expire and delete in 12 hours.")}
+                              {durationKey === "24h" &&
+                                (locale === "bn"
+                                  ? "২৪ ঘণ্টা (১ দিন) পর এই ডাকবাক্স ও এর সমস্ত চিঠি চিরতরে স্বয়ংক্রিয়ভাবে মুছে যাবে।"
+                                  : "This mailbox and all letters will automatically expire and delete in 24 hours (1 day).")}
+                              {durationKey === "3d" &&
+                                (locale === "bn"
+                                  ? "৩ দিন (৭২ ঘণ্টা) পর এই ডাকবাক্স ও এর সমস্ত চিঠি চিরতরে স্বয়ংক্রিয়ভাবে মুছে যাবে।"
+                                  : "This mailbox and all letters will automatically expire and delete in 3 days (72 hours).")}
+                              {durationKey === "7d" &&
+                                (locale === "bn"
+                                  ? "৭ দিন (১ সপ্তাহ) পর এই ডাকবাক্স ও এর সমস্ত চিঠি চিরতরে স্বয়ংক্রিয়ভাবে মুছে যাবে।"
+                                  : "This mailbox and all letters will automatically expire and delete in 7 days (1 week).")}
                             </p>
                           </div>
 
@@ -647,11 +707,38 @@ export default function HomePage() {
                             </p>
                           </div>
 
+                          {/* Inline Form Error & Recovery Notice */}
+                          {formError && (
+                            <div
+                              role="alert"
+                              className="p-3.5 rounded-2xl bg-warn-surface border border-warn-edge text-xs space-y-2"
+                            >
+                              <div className="flex items-start gap-2 text-ink">
+                                <span className="w-2 h-2 rounded-full bg-wax mt-1 shrink-0" />
+                                <span className="font-medium leading-relaxed">{formError}</span>
+                              </div>
+                              {takenMailboxName && (
+                                <div className="pl-4 pt-1 border-t border-warn-edge/60 flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-[11px] text-ink-muted">
+                                    {locale === "bn" ? "এটি কি আপনার ডাকবাক্স?" : "Is this your mailbox?"}
+                                  </span>
+                                  <Link
+                                    href={`/recover?username=${encodeURIComponent(takenMailboxName)}`}
+                                    className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-wax hover:underline"
+                                  >
+                                    <KeyRound size={12} />
+                                    <span>{locale === "bn" ? "পাসকোড দিয়ে লগইন করুন →" : "Login with Passcode →"}</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <Button
                             type="submit"
                             variant="primary"
                             size="lg"
-                            className="w-full mt-2 rounded-full"
+                            className="w-full mt-2 rounded-full cursor-pointer"
                             isLoading={isSubmitting}
                             disabled={availability === "taken"}
                           >

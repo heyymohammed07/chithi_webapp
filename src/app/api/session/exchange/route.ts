@@ -52,12 +52,14 @@ export async function POST(req: NextRequest) {
     const remainingSeconds = Math.max(1, Math.floor((mailbox.expiresAt - Date.now()) / 1000));
     const maxAge = Math.min(remainingSeconds, 7 * 24 * 3600);
 
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+    const isLocal = Boolean(host?.includes("localhost") || host?.includes("127.0.0.1"));
     const response = apiOk({ exchanged: true });
     response.cookies.set({
       name: `chithi_s_${usernameLower}`,
       value: input.key.trim(),
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" && !isLocal,
       sameSite: "lax",
       path: "/",
       maxAge,

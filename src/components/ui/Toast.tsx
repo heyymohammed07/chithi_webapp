@@ -27,18 +27,18 @@ export function ToastViewport() {
         return (
           <div
             key={toast.id}
-            className="pointer-events-auto flex items-center justify-between gap-3 p-3.5 bg-ink-raised border border-ink-hairline rounded-card shadow-modal text-ivory text-sm"
+            className="pointer-events-auto flex items-center justify-between gap-3 p-3.5 bg-surface-raised border border-edge shadow-2xl rounded-2xl text-ink text-sm"
           >
             <div className="flex items-center gap-2.5">
               {icon}
-              <span className="leading-snug">{toast.message}</span>
+              <span className="leading-snug font-medium">{toast.message}</span>
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-ash hover:text-ivory transition-colors p-1"
+              className="text-ink-muted hover:text-ink transition-colors p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
               aria-label="Dismiss toast"
             >
-              <X size={16} strokeWidth={1.25} />
+              <X size={16} strokeWidth={1.5} />
             </button>
           </div>
         );

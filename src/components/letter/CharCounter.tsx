@@ -23,10 +23,10 @@ export function CharCounter({ text, maxChars = LETTER_BODY_MAX }: CharCounterPro
   const isWax = count >= maxChars;
 
   const colorClass = isWax
-    ? "text-wax font-bold"
+    ? "text-danger font-bold"
     : isWarn
     ? "text-warn font-semibold"
-    : "text-ash";
+    : "text-ink-muted";
 
   const displayCount =
     locale === "bn"
@@ -36,7 +36,7 @@ export function CharCounter({ text, maxChars = LETTER_BODY_MAX }: CharCounterPro
   return (
     <div className={`text-xs font-mono select-none ${colorClass}`}>
       <span>{displayCount}</span>{" "}
-      <span className="text-[11px] text-ash-dim">{t("composer.charCount")}</span>
+      <span className="text-[11px] text-ink-muted/80">{t("composer.charCount")}</span>
     </div>
   );
 }

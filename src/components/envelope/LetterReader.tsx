@@ -163,7 +163,7 @@ export function LetterReader({
               <span id="reader-heading" className="sr-only">
                 {letter.senderName ? `${t("reader.fromSender")} ${letter.senderName}` : t("reader.anonymousSender")}
               </span>
-              {letter.burnAt !== null && (
+              {typeof letter.burnAt === "number" && !isNaN(letter.burnAt) && letter.burnAt > 0 && (
                 <BurnTimer
                   burnAt={letter.burnAt}
                   onBurned={() => {
@@ -284,6 +284,7 @@ export function LetterReader({
 
               {!letter.burnAfterReading && !letter.published && (
                 <IconButton
+                  data-testid="publish-to-feed-btn"
                   label={t("reader.actionPublish")}
                   onClick={() => setConfirmPublish(true)}
                   size="sm"
@@ -366,6 +367,7 @@ export function LetterReader({
               {t("reader.cancel")}
             </Button>
             <Button
+              data-testid="confirm-publish-btn"
               variant="primary"
               onClick={handlePublish}
               isLoading={isActionLoading}

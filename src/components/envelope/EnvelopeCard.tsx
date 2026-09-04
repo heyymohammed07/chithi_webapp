@@ -24,6 +24,7 @@ export function EnvelopeCard({ letter, onClick, isOpening = false }: EnvelopeCar
     <button
       type="button"
       onClick={onClick}
+      data-testid="envelope-card"
       aria-label={`Open letter from ${formatRelativeTime(letter.createdAt, locale)}`}
       className={`group relative w-full text-left p-6 sm:p-7 rounded-3xl bg-canvas dark:bg-surface border border-edge shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] hover:shadow-md transition-all duration-200 select-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-wax focus-visible:outline-offset-2 ${
         isUnopened

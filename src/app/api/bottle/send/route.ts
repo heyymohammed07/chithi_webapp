@@ -21,11 +21,9 @@ export async function POST(req: NextRequest) {
 
     const input = await parseJsonBody(req, SendBottleSchema);
 
-    // Determine sender mailbox to avoid self-targeting
-    let senderUsername = input.senderUsername?.toLowerCase()?.trim();
-    if (!senderUsername) {
-      senderUsername = getSessionUsername(req) ?? undefined;
-    }
+    // Determine sender mailbox to avoid self-targeting (server-authoritative session takes precedence)
+    const sessionUsername = getSessionUsername(req, input.senderUsername);
+    const senderUsername = sessionUsername ?? input.senderUsername?.toLowerCase()?.trim();
 
     const result = await sendBottle(input, viewerHash, senderUsername);
     return apiOk(result);

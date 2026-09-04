@@ -1,21 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { ApiOk, ApiErr, ErrorCode } from "./types";
+import { ApiOk, ApiErr, ErrorCode, ApiError } from "./types";
 import { MAX_JSON_BODY_BYTES } from "./constants";
 import { sha256 } from "./crypto";
 import { env } from "./env";
 
-export class ApiError extends Error {
-  constructor(
-    public code: ErrorCode,
-    public messageKey: string,
-    public status: number,
-    public details?: Record<string, string[]>
-  ) {
-    super(messageKey);
-    this.name = "ApiError";
-  }
-}
+export { ApiError };
 
 export function apiOk<T>(data: T, init?: ResponseInit): NextResponse<ApiOk<T>> {
   const headers = new Headers(init?.headers);

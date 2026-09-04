@@ -10,7 +10,7 @@ export function Skeleton({
   return (
     <div
       style={style}
-      className={`animate-pulse bg-ink-hairline/60 rounded-input ${className}`}
+      className={`animate-pulse bg-edge/80 rounded-xl ${className}`}
     />
   );
 }

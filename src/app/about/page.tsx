@@ -13,7 +13,7 @@ export default function AboutPage() {
     <PageShell>
       <div className="max-w-2xl mx-auto py-8 space-y-10">
         {/* Header */}
-        <div className="space-y-3 border-b border-ink-hairline pb-6 text-center">
+        <div className="space-y-3 border-b border-edge pb-6 text-center">
           <h1 className="text-3xl sm:text-4xl font-serif font-bold text-ink">
             {t("about.title")}
           </h1>
