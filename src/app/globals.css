@@ -11,7 +11,7 @@
   --ink: hsl(22 24% 18%);
   --ink-heading: hsl(22 33% 13%);
   --ink-muted: hsl(25 13% 46%);
-  --ink-faint: hsl(25 8% 61%);
+  --ink-faint: hsl(25 15% 42%);
   --wax: hsl(19 76% 64%);
   --wax-dim: hsl(19 63% 56%);
   --gold: hsl(19 76% 64%);
@@ -39,7 +39,7 @@
 
   --primary: var(--peach);
   --primary-hover: var(--peach-hover);
-  --primary-foreground: var(--ink);
+  --primary-foreground: var(--peach-text);
   --stationery-canvas: var(--canvas);
   --stationery-card: var(--surface);
   --stationery-border: var(--edge);
@@ -54,7 +54,7 @@
   --ink: hsl(20 45% 93%);
   --ink-heading: hsl(34 100% 97%);
   --ink-muted: hsl(303 9% 61%);
-  --ink-faint: hsl(293 11% 41%);
+  --ink-faint: hsl(293 15% 68%);
   --wax: hsl(19 76% 64%);
   --wax-dim: hsl(19 63% 56%);
   --gold: hsl(39 100% 85%);
@@ -82,7 +82,7 @@
 
   --primary: var(--peach);
   --primary-hover: var(--peach-hover);
-  --primary-foreground: var(--ink);
+  --primary-foreground: var(--peach-text);
   --stationery-canvas: var(--canvas);
   --stationery-card: var(--surface);
   --stationery-border: var(--edge);

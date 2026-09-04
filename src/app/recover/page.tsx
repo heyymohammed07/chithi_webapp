@@ -208,7 +208,7 @@ export default function RecoverPage() {
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full rounded-full bg-peach hover:bg-gold text-ink font-semibold border border-gold/40"
+              className="w-full rounded-full bg-peach hover:bg-peach-hover text-peach-text font-semibold border border-peach-hover shadow-sm"
               isLoading={isSubmitting}
             >
               {t("recover.submit")}

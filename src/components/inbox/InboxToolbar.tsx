@@ -42,7 +42,7 @@ export function InboxToolbar({
           onClick={() => onFilterChange?.("unread")}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all cursor-pointer ${
             activeFilter === "unread"
-              ? "bg-peach text-ink font-bold border border-edge shadow-xs"
+              ? "bg-peach text-peach-text font-bold border border-peach-hover shadow-xs"
               : "text-ink-muted hover:text-ink dark:hover:text-ink-heading hover:bg-black/5 dark:hover:bg-white/5"
           }`}
         >
@@ -58,7 +58,7 @@ export function InboxToolbar({
           onClick={() => onFilterChange?.("all")}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all cursor-pointer ${
             activeFilter === "all"
-              ? "bg-peach text-ink font-bold border border-edge shadow-xs"
+              ? "bg-peach text-peach-text font-bold border border-peach-hover shadow-xs"
               : "text-ink-muted hover:text-ink dark:hover:text-ink-heading hover:bg-black/5 dark:hover:bg-white/5"
           }`}
         >

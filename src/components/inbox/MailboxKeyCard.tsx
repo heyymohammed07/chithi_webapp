@@ -94,7 +94,7 @@ export function MailboxKeyCard({
           <Button
             variant="primary"
             size="lg"
-            className="w-full bg-peach hover:bg-peach/80 text-ink font-semibold border border-edge"
+            className="w-full bg-peach hover:bg-peach-hover text-peach-text font-semibold border border-peach-hover shadow-sm"
             onClick={onEnterInbox}
           >
             {t("keyCard.openInbox")}

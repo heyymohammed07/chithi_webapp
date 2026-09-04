@@ -182,6 +182,7 @@ export const bn: Dict = {
     anonymousDesc: "চিঠির প্রাপক আপনার নাম দেখতে পাবেন না।",
     namedDesc: "চিঠির নিচে আপনার নাম স্পষ্টভাবে প্রাপক দেখতে পাবেন।",
     fontPickerTitle: "হস্তাক্ষর ও ফন্ট শৈলী",
+    senderNameRequired: "অনুগ্রহ করে আপনার নাম লিখুন অথবা বেনামী নির্বাচন করুন",
   },
   sent: {
     title: "চিঠি পাঠানো হয়েছে!",
@@ -243,6 +244,10 @@ export const bn: Dict = {
     successTitle: "সাগরে ভেসে গেল আপনার চিঠি",
     successDesc: "আপনার চিঠি কোনো অচেনা তীরে গিয়ে ঠেকেছে। হয়তো কেউ গভীর মমতায় তা পড়বে।",
     castAnother: "আরেকটি চিঠি ভাসান",
+    authRequiredTitle: "একটি ডাকবাক্স প্রয়োজন",
+    authRequiredSubtitle: "সাগরে চিঠি ভাসিয়ে দেওয়ার আগে, আপনার একটি সক্রিয় ডাকবাক্স থাকা প্রয়োজন।",
+    authRequiredCreateBtn: "নতুন ডাকবাক্স তৈরি করুন",
+    authRequiredLoginBtn: "ডাকবাক্স পুনরুদ্ধার করুন",
   },
   feed: {
     badge: "পাবলিক ওয়াল",

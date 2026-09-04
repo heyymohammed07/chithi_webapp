@@ -3,6 +3,7 @@ import { SendBottleSchema } from "@/lib/schemas";
 import { sendBottle } from "@/lib/bottle";
 import { checkRateLimit } from "@/lib/ratelimit";
 import { apiOk, apiErr, ApiError, getRateKey, getViewerHash, parseJsonBody, rateLimitHeaders } from "@/lib/api";
+import { getSessionUsername } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,12 +22,9 @@ export async function POST(req: NextRequest) {
     const input = await parseJsonBody(req, SendBottleSchema);
 
     // Determine sender mailbox to avoid self-targeting
-    let senderUsername = input.senderUsername?.toLowerCase();
+    let senderUsername = input.senderUsername?.toLowerCase()?.trim();
     if (!senderUsername) {
-      const activeCookie = req.cookies.getAll().find((c) => c.name.startsWith("chithi_s_"));
-      if (activeCookie) {
-        senderUsername = activeCookie.name.slice("chithi_s_".length).toLowerCase();
-      }
+      senderUsername = getSessionUsername(req) ?? undefined;
     }
 
     const result = await sendBottle(input, viewerHash, senderUsername);

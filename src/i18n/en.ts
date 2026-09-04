@@ -180,6 +180,7 @@ export const en = {
     anonymousDesc: "The recipient will not see who sent this letter.",
     namedDesc: "Your name will be clearly visible to the recipient.",
     fontPickerTitle: "Handwriting & Font Style",
+    senderNameRequired: "Please enter your name or choose anonymous",
   },
   sent: {
     title: "Your letter is on its way",
@@ -241,6 +242,10 @@ export const en = {
     successTitle: "Bottle Cast into the Sea",
     successDesc: "Your letter washed ashore in a stranger's mailbox. They are reading it in the quiet of the night.",
     castAnother: "Cast another bottle",
+    authRequiredTitle: "A Mailbox is Required",
+    authRequiredSubtitle: "Before casting a message into the sea, you need an active mailbox to anchor your journey.",
+    authRequiredCreateBtn: "Create a Mailbox",
+    authRequiredLoginBtn: "Recover Existing Mailbox",
   },
   feed: {
     badge: "Public Wall",

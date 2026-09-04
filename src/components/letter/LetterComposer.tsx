@@ -53,7 +53,7 @@ export function LetterComposer({
   const [isSending, setIsSending] = useState(false);
   const [isSelfSending, setIsSelfSending] = useState(false);
 
-  const { sessions } = useSession();
+  const { sessions, activeUsername } = useSession();
 
   // Self-letter detection guard (§3.1, §UI-01)
   useEffect(() => {
@@ -82,12 +82,7 @@ export function LetterComposer({
     }
 
     if (!isAnonymous && !senderName.trim()) {
-      showToast(
-        locale === "bn"
-          ? "অনুগ্রহ করে আপনার নাম লিখুন অথবা বেনামী নির্বাচন করুন"
-          : "Please enter your name or choose anonymous",
-        "warn"
-      );
+      showToast(t("composer.senderNameRequired"), "warn");
       return;
     }
 
@@ -96,8 +91,10 @@ export function LetterComposer({
     try {
       const cleanHints = hints.map((h) => h.trim()).filter((h) => h.length > 0);
 
-      let localSenderUsername: string | undefined;
-      if (typeof window !== "undefined") {
+      let localSenderUsername =
+        activeUsername ||
+        (sessions.length > 0 ? sessions[0]?.username : undefined);
+      if (!localSenderUsername && typeof window !== "undefined") {
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
           if (k && k.startsWith("chithi:token:")) {
@@ -205,7 +202,7 @@ export function LetterComposer({
         <div className="pt-2">
           <Link
             href={`/inbox/${recipientUsername}`}
-            className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-peach hover:bg-gold/40 text-ink font-semibold border border-gold/40 shadow-sm transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-peach hover:bg-peach-hover text-peach-text font-semibold border border-peach-hover shadow-sm transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
           >
             <Mailbox size={16} className="text-wax" />
             <span>{t("composer.openMyInbox")}</span>
@@ -234,7 +231,7 @@ export function LetterComposer({
             onClick={() => setBottleTarget(tgt)}
             className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all cursor-pointer ${
               bottleTarget === tgt
-                ? "bg-peach border-gold text-ink ring-1 ring-gold font-bold"
+                ? "bg-peach border-peach-hover text-peach-text ring-1 ring-peach-hover font-bold"
                 : "bg-canvas border-edge text-ink-muted hover:text-ink"
             }`}
           >
@@ -286,7 +283,7 @@ export function LetterComposer({
           onClick={() => setIsAnonymous(true)}
           className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             isAnonymous
-              ? "bg-peach border-gold text-ink ring-1 ring-gold font-bold shadow-xs"
+              ? "bg-peach border-peach-hover text-peach-text ring-1 ring-peach-hover font-bold shadow-xs"
               : "bg-canvas border-edge text-ink-muted hover:text-ink"
           }`}
         >
@@ -299,7 +296,7 @@ export function LetterComposer({
           onClick={() => setIsAnonymous(false)}
           className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             !isAnonymous
-              ? "bg-peach border-gold text-ink ring-1 ring-gold font-bold shadow-xs"
+              ? "bg-peach border-peach-hover text-peach-text ring-1 ring-peach-hover font-bold shadow-xs"
               : "bg-canvas border-edge text-ink-muted hover:text-ink"
           }`}
         >

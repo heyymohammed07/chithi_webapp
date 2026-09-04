@@ -16,6 +16,7 @@ export interface SessionContextValue {
   isLoading: boolean;
   setActiveUsername: (username: string) => void;
   refresh: () => Promise<void>;
+  refreshSession: () => Promise<void>;
   logout: (username?: string) => Promise<void>;
 }
 
@@ -141,6 +142,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       setActiveUsername,
       refresh,
+      refreshSession: refresh,
       logout,
     }),
     [sessions, activeUsername, activeSession, isLoading, setActiveUsername, refresh, logout]

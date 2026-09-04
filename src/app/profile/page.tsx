@@ -209,7 +209,7 @@ export default function ProfilePage() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full rounded-full gap-2 font-medium shadow-sm bg-peach hover:bg-gold text-ink border border-gold/40"
+                  className="w-full rounded-full gap-2 font-semibold shadow-sm bg-peach hover:bg-peach-hover text-peach-text border border-peach-hover"
                 >
                   <KeyRound size={16} />
                   <span>{t("profile.loginAction")}</span>
@@ -249,7 +249,7 @@ export default function ProfilePage() {
                 <Button
                   variant="primary"
                   size="md"
-                  className="w-full rounded-full gap-2 font-medium shadow-sm bg-peach hover:bg-gold text-ink border border-gold/40"
+                  className="w-full rounded-full gap-2 font-semibold shadow-sm bg-peach hover:bg-peach-hover text-peach-text border border-peach-hover"
                 >
                   <Sparkles size={16} />
                   <span>{t("profile.createAnother")}</span>
@@ -336,7 +336,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={requestPermission}
-                  className="px-3.5 py-1.5 rounded-full bg-peach hover:bg-gold text-ink text-xs font-semibold border border-gold/40 shadow-sm transition-transform active:scale-95 cursor-pointer shrink-0"
+                  className="px-3.5 py-1.5 rounded-full bg-peach hover:bg-peach-hover text-peach-text text-xs font-semibold border border-peach-hover shadow-sm transition-transform active:scale-95 cursor-pointer shrink-0"
                 >
                   {locale === "bn" ? "অনুমতি দিন" : "Enable Alerts"}
                 </button>
@@ -364,9 +364,9 @@ export default function ProfilePage() {
               <Link href={`/inbox/${profileData.username}`} className="block w-full">
                 <button
                   type="button"
-                  className="w-full py-4 px-6 rounded-2xl bg-peach hover:bg-gold text-ink font-semibold text-base shadow-lg transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] cursor-pointer border border-edge"
+                  className="w-full py-4 px-6 rounded-2xl bg-peach hover:bg-peach-hover text-peach-text font-semibold text-base shadow-lg transition-all flex items-center justify-center gap-2.5 active:scale-[0.99] cursor-pointer border border-peach-hover"
                 >
-                  <Mail className="w-5 h-5 text-ink" />
+                  <Mail className="w-5 h-5 text-peach-text" />
                   <span>{locale === "bn" ? "গোপন ইনবক্স খুলুন" : "Open Secret Inbox"}</span>
                 </button>
               </Link>

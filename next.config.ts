@@ -1,9 +1,6 @@
 import type { NextConfig } from "next";
 
-const isProduction = process.env.NODE_ENV === "production";
-const scriptSrc = isProduction
-  ? "script-src 'self' 'unsafe-inline';"
-  : "script-src 'self' 'unsafe-eval' 'unsafe-inline';";
+const scriptSrc = "script-src 'self' 'unsafe-inline';";
 
 const cspHeader = `
   default-src 'self';

@@ -21,6 +21,8 @@ export function middleware(request: NextRequest) {
     pathname !== "/" &&
     !pathname.startsWith("/api") &&
     !pathname.startsWith("/feed") &&
+    !pathname.startsWith("/bottle") &&
+    !pathname.startsWith("/about") &&
     !pathname.startsWith("/sitemap") &&
     !pathname.startsWith("/robots") &&
     !pathname.includes(".");

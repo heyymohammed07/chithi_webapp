@@ -94,4 +94,22 @@ export const keys = {
    * Uses mb:idx: prefix to guarantee zero collision with user mailboxes per DATA-01.
    */
   activeIndex: (): string => "mb:idx:active",
+
+  /**
+   * Rate limit bucket key: rl:{bucket}:{identifier}
+   */
+  rateLimit: (bucket: string, identifier: string): string =>
+    `rl:${bucket}:${identifier}`,
+
+  /**
+   * Temporary IP abuse block: abuse:block:{rateKey}
+   */
+  abuseBlock: (rateKey: string): string =>
+    `abuse:block:${rateKey}`,
+
+  /**
+   * IP abuse violation counter: abuse:count:{rateKey}
+   */
+  abuseCount: (rateKey: string): string =>
+    `abuse:count:${rateKey}`,
 } as const;

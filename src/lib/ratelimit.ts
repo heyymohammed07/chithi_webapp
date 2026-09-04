@@ -1,6 +1,8 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { env } from "./env";
+import { getRedis } from "./redis";
+import { keys } from "./keys";
 
 export type LimiterBucket =
   | "create"
@@ -147,15 +149,88 @@ const limiters: Record<LimiterBucket, Ratelimit | null> = {
     : null,
 };
 
+// Abuse tracking constants (§SEC-04)
+const ABUSE_VIOLATION_WINDOW_SECS = 600; // 10 minutes rolling window for violations
+const ABUSE_THRESHOLD = 3; // 3 rate-limit violations within window triggers temporary block
+const ABUSE_BLOCK_DURATION_SECS = 900; // 15 minutes initial block
+const ABUSE_SEVERE_THRESHOLD = 6; // Severe abuse threshold
+const ABUSE_SEVERE_BLOCK_DURATION_SECS = 1800; // 30 minutes severe block
+
+/**
+ * Checks whether an identifier (hashed IP rateKey) is currently blocked on the Redis abuse blocklist.
+ */
+export async function checkAbuseBlock(
+  identifier: string
+): Promise<{ blocked: boolean; reset: number }> {
+  try {
+    const redis = getRedis();
+    const blockKey = keys.abuseBlock(identifier);
+    const blockedVal = await redis.get<string | number>(blockKey);
+    if (blockedVal !== null && blockedVal !== undefined) {
+      const ttlSec = await redis.ttl(blockKey);
+      const reset = Date.now() + (ttlSec > 0 ? ttlSec * 1000 : ABUSE_BLOCK_DURATION_SECS * 1000);
+      return { blocked: true, reset };
+    }
+  } catch (err) {
+    console.error("[chithi] Error checking abuse blocklist:", err);
+  }
+  return { blocked: false, reset: 0 };
+}
+
+/**
+ * Records a rate limit violation against an identifier.
+ * Automatically establishes a temporary Redis block if threshold is crossed.
+ */
+export async function recordAbuseViolation(
+  identifier: string
+): Promise<{ blocked: boolean; reset: number }> {
+  try {
+    const redis = getRedis();
+    const countKey = keys.abuseCount(identifier);
+    const blockKey = keys.abuseBlock(identifier);
+
+    const violations = await redis.incr(countKey);
+    if (violations === 1) {
+      await redis.expire(countKey, ABUSE_VIOLATION_WINDOW_SECS);
+    }
+
+    if (violations >= ABUSE_THRESHOLD) {
+      const duration =
+        violations >= ABUSE_SEVERE_THRESHOLD
+          ? ABUSE_SEVERE_BLOCK_DURATION_SECS
+          : ABUSE_BLOCK_DURATION_SECS;
+
+      const reset = Date.now() + duration * 1000;
+      await redis.set(blockKey, String(reset), { ex: duration });
+      return { blocked: true, reset };
+    }
+  } catch (err) {
+    console.error("[chithi] Error recording abuse violation:", err);
+  }
+  return { blocked: false, reset: 0 };
+}
+
 let hasWarnedDevShim = false;
 
 /**
  * Checks a named rate limit bucket. Fails open on infrastructure errors.
+ * Automatically enforces IP abuse blocklist and records repeat violations.
  */
 export async function checkRateLimit(
   bucket: LimiterBucket,
   identifier: string
 ): Promise<RateLimitResult> {
+  // 1. Immediately check temporary abuse blocklist before any work
+  const abuse = await checkAbuseBlock(identifier);
+  if (abuse.blocked) {
+    return {
+      success: false,
+      limit: 0,
+      remaining: 0,
+      reset: abuse.reset,
+    };
+  }
+
   const limiter = limiters[bucket];
 
   if (!limiter) {
@@ -175,6 +250,18 @@ export async function checkRateLimit(
 
   try {
     const result = await limiter.limit(identifier);
+    if (!result.success) {
+      // Record rate limit violation to track potential abuse
+      const abuseResult = await recordAbuseViolation(identifier);
+      if (abuseResult.blocked) {
+        return {
+          success: false,
+          limit: result.limit,
+          remaining: 0,
+          reset: abuseResult.reset,
+        };
+      }
+    }
     return {
       success: result.success,
       limit: result.limit,

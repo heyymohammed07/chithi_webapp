@@ -181,8 +181,15 @@ export default function HomePage() {
       const json = await res.json();
 
       if (json.ok) {
-        setCreatedMailbox(json.data);
+        const created = json.data;
+        setCreatedMailbox(created);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`chithi:token:${created.username.toLowerCase()}`, created.accessToken);
+          localStorage.setItem("chithi:active", created.username.toLowerCase());
+          sessionStorage.setItem(`chithi:passcode:${created.username.toLowerCase()}`, created.recoveryPasscode);
+        }
         await refreshSession();
+        router.push(`/inbox/${created.username}?key=${encodeURIComponent(created.accessToken)}`);
       } else {
         showToast(t(json.error?.message || "errors.generic"), "error");
       }
@@ -209,7 +216,7 @@ export default function HomePage() {
             SCENARIO A — ACTIVE LOGGED-IN MAILBOX (Section 9)
             Strictly hide Create Mailbox form. Render Authenticated Mailbox Hub.
            ========================================================================= */}
-        {isAuthenticated && activeUser ? (
+        {isAuthenticated && activeUser && !createdMailbox ? (
           <section className="pt-4 md:pt-8 space-y-8">
             {/* 1. Welcoming Banner Card with Washi Tape */}
             <div className="relative p-6 sm:p-10 rounded-3xl bg-surface border border-edge shadow-[0_12px_32px_-8px_rgba(78,59,44,0.06)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] overflow-hidden transition-colors">
@@ -607,8 +614,8 @@ export default function HomePage() {
                                     onClick={() => setDurationKey(key)}
                                     className={`py-2 px-1 text-center font-mono text-xs rounded-xl border transition-all select-none ${
                                       isSelected
-                                        ? "bg-peach border-gold text-ink ring-1 ring-gold font-bold shadow-sm"
-                                        : "bg-surface border-edge text-ink-muted hover:text-ink hover:border-gold"
+                                        ? "bg-peach border-peach-hover text-peach-text ring-1 ring-peach-hover font-bold shadow-sm"
+                                        : "bg-surface border-edge text-ink-muted hover:text-ink hover:border-peach-hover"
                                     }`}
                                   >
                                     {label}

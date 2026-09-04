@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/useToast";
 import { useLocale } from "@/hooks/useLocale";
 import { ShieldAlert, Copy, Bell } from "lucide-react";
 import { useLetterNotifications } from "@/hooks/useLetterNotifications";
+import { useSession } from "@/context/SessionContext";
 
 export default function InboxPage(props: {
   params: Promise<{ username: string }>;
@@ -38,6 +39,19 @@ export default function InboxPage(props: {
   const { t, locale } = useLocale();
   const { showToast } = useToast();
   const { token, saveToken, isLoaded: isTokenLoaded } = useAccessToken(username);
+  const { refreshSession } = useSession();
+
+  const [createdPasscode, setCreatedPasscode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem(`chithi:passcode:${usernameLower}`);
+      if (stored) {
+        setCreatedPasscode(stored);
+        setIsKeyCardOpen(true);
+      }
+    }
+  }, [usernameLower]);
   const { permission, isSupported, isGranted, requestPermission } = useLetterNotifications(username);
 
   const [mailboxMeta, setMailboxMeta] = useState<{
@@ -101,13 +115,21 @@ export default function InboxPage(props: {
         body: JSON.stringify({ username, key: keyParam }),
       })
         .then((res) => res.json())
+        .then(async (json) => {
+          if (json.ok) {
+            await refreshSession();
+          }
+        })
         .catch((err) => console.error("Session exchange error:", err));
 
       saveToken(keyParam);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("chithi:active", usernameLower);
+      }
       // Strip key from URL to prevent Referer leaks per SEC-01
       router.replace(pathname, { scroll: false });
     }
-  }, [searchParams, username, saveToken, router, pathname]);
+  }, [searchParams, username, usernameLower, saveToken, router, pathname, refreshSession]);
 
   // 2. Load inbox data
   const loadInbox = useCallback(async () => {
@@ -375,7 +397,7 @@ export default function InboxPage(props: {
               <Link href="/">
                 <button
                   type="button"
-                  className="bg-peach hover:bg-gold text-ink font-semibold border border-gold/40 shadow-sm px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
+                  className="bg-peach hover:bg-peach-hover text-peach-text font-semibold border border-peach-hover shadow-sm px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
                 >
                   {t("inbox.createOwn")}
                 </button>
@@ -403,7 +425,7 @@ export default function InboxPage(props: {
           </p>
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/recover" className="w-full sm:w-auto">
-              <Button variant="primary" className="w-full rounded-full bg-peach hover:bg-gold text-ink font-semibold border border-gold/40">
+              <Button variant="primary" className="w-full rounded-full">
                 {t("inbox.usePasscode")}
               </Button>
             </Link>
@@ -445,7 +467,7 @@ export default function InboxPage(props: {
             <button
               type="button"
               onClick={requestPermission}
-              className="px-3.5 py-1.5 rounded-full bg-peach hover:bg-gold text-ink text-xs font-semibold border border-gold/40 shadow-sm transition-transform active:scale-95 cursor-pointer shrink-0"
+              className="px-3.5 py-1.5 rounded-full bg-peach hover:bg-peach-hover text-peach-text text-xs font-semibold border border-peach-hover shadow-sm transition-transform active:scale-95 cursor-pointer shrink-0"
             >
               {t("notifications.enableAction")}
             </button>
@@ -490,7 +512,7 @@ export default function InboxPage(props: {
                     navigator.clipboard.writeText(publicLink);
                     showToast(t("keyCard.copied"), "success");
                   }}
-                  className="bg-peach hover:bg-gold text-ink font-semibold border border-gold/40 shadow-sm px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
+                  className="bg-peach hover:bg-peach-hover text-peach-text font-semibold border border-peach-hover shadow-sm px-6 py-2.5 rounded-full inline-flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
                 >
                   <Copy size={16} strokeWidth={1.5} />
                   <span>{t("inbox.empty.copyCta")}</span>
@@ -615,11 +637,18 @@ export default function InboxPage(props: {
       {/* Keys & Passcode Modal */}
       <Modal
         isOpen={isKeyCardOpen}
-        onClose={() => setIsKeyCardOpen(false)}
+        onClose={() => {
+          setIsKeyCardOpen(false);
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem(`chithi:passcode:${usernameLower}`);
+          }
+        }}
         maxWidth="max-w-xl"
       >
         <MailboxKeyCard
           username={username}
+          recoveryPasscode={createdPasscode || undefined}
+          isInitialCreation={Boolean(createdPasscode)}
           publicUrl={publicLink}
         />
       </Modal>
